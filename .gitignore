@@ -1,0 +1,17 @@
+# Kişisel veriler / personal data — asla yükleme / never commit
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+backups/
+kaermorhen-ayar.json
+
+# İndirilen kart verisi (CD PROJEKT RED'e ait) / downloaded card data (owned by CD PROJEKT RED)
+cards.js
+
+# Araçlar / tooling
+.claude/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

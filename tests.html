@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Testler çalışıyor...</title>
+<style>
+  body { background: #0c0d10; color: #ddd5c4; font-family: Georgia, serif; max-width: 900px; margin: 30px auto; padding: 0 20px; }
+  h1 { color: #c9a45c; font-family: Georgia, serif; }
+  #summary { font-size: 1.3rem; margin: 10px 0 20px; }
+  ul { list-style: none; padding: 0; }
+  li { padding: 7px 10px; border-bottom: 1px solid #2a2721; }
+  .good { color: #9fd08a; } .bad { color: #f09090; }
+  .msg { color: #e8b0b0; font-family: monospace; font-size: .85rem; margin: 4px 0 0 18px; }
+  a { color: #e8cf8f; }
+  table.sim { border-collapse: collapse; width: 100%; font-size: .9rem; } .sim td, .sim th { border-bottom: 1px solid #2a2721; padding: 6px 8px; text-align: left; } .sim th { color: #c9a45c; }
+</style>
+</head>
+<body>
+<h1>Habits of Witchers · Otomatik testler</h1>
+<p>Oyun motorunu (engine.js) sahte saatle çalıştırır. Veritabanına dokunmaz. Yeni özellik ekledikten sonra bu sayfayı yenile. <a href="/?slot=test">Test kaydıyla uygulamayı aç</a></p>
+<div id="summary"></div>
+<ul id="list"></ul>
+<script src="cards.js"></script>
+<script src="monsters.js"></script>
+<script src="swords.js"></script>
+<script src="engine.js"></script>
+<script src="tests.js"></script>
+</body>
+</html>

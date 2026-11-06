@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0c0d10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<link rel="icon" href="/icons/icon-192.png">
+<title>Habits of Witchers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="hero">
+    <div id="medallion" class="medallion"></div>
+    <div class="hero-info">
+      <div class="hero-name"><span id="heroName">—</span> <small id="heroSchool"></small></div>
+      <div class="bars">
+        <div class="bar hp"><div id="hpFill" class="fill"></div><span id="hpText"></span></div>
+        <div class="bar xp"><div id="xpFill" class="fill"></div><span id="xpText"></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat" title="Seviye"><span class="ico">⚔</span><b id="lvl">1</b><small>Seviye</small></div>
+    <div class="stat" title="Altın (oren)"><span class="ico">🪙</span><b id="gold">0</b><small>Oren</small></div>
+    <div class="stat" title="Kırıntı (tekrar kartlardan gelir)"><span class="ico">✦</span><b id="scraps">0</b><small>Kırıntı</small></div>
+    <div class="stat" id="chainStat" title="Zincir"><span class="ico">⛓</span><b id="chainLen">0</b><small>Zincir</small></div>
+    <div class="stat" title="Swallow: kaçırılan günde canavarın vurmasını ve toparlanmasını engeller"><span class="ico">🧪</span><b id="swallow">0</b><small>Swallow</small></div>
+  </div>
+</header>
+
+<nav id="tabs">
+  <button data-tab="home" class="active">Kontrat</button>
+  <button data-tab="mainquest">Ana Görev</button>
+  <button data-tab="quests">Yan Görevler</button>
+  <button data-tab="collection">Koleksiyon</button>
+  <button data-tab="links">Kart Bağları</button>
+  <button data-tab="bestiary">Bestiary</button>
+  <button data-tab="shop">Tüccar</button>
+  <button data-tab="achievements">Başarımlar</button>
+  <button data-tab="hall">Okul</button>
+  <button data-tab="history">Kayıtlar</button>
+  <button data-tab="settings">Ayarlar</button>
+</nav>
+
+<main>
+  <section id="tab-home" class="tab active">
+    <div class="grid2">
+      <div class="panel" id="contractPanel"></div>
+      <div class="panel" id="monsterPanel"></div>
+    </div>
+    <div class="panel" id="chainPanel"></div>
+    <div class="panel" id="weekStrip"></div>
+    <div class="panel" id="logPanel"><h2>Günlük</h2><ul id="logList"></ul></div>
+  </section>
+
+  <section id="tab-mainquest" class="tab"><div class="panel" id="mainQuestPanel"></div></section>
+  <section id="tab-quests" class="tab"><div class="panel" id="questPanel"></div></section>
+  <section id="tab-collection" class="tab"><div class="panel" id="collectionPanel"></div></section>
+  <section id="tab-links" class="tab"><div class="panel" id="linksPanel"></div></section>
+  <section id="tab-bestiary" class="tab"><div class="panel" id="bestiaryPanel"></div></section>
+  <section id="tab-shop" class="tab"><div class="panel" id="shopPanel"></div></section>
+  <section id="tab-achievements" class="tab"><div class="panel" id="achPanel"></div></section>
+  <section id="tab-hall" class="tab"><div class="panel" id="hallPanel"></div></section>
+  <section id="tab-history" class="tab"><div class="panel" id="historyPanel"></div></section>
+  <section id="tab-settings" class="tab"><div class="panel" id="settingsPanel"></div></section>
+</main>
+
+<div id="modal" class="modal hidden"><div class="modal-box" id="modalBox"></div></div>
+<div id="toasts"></div>
+
+<script src="cards.js"></script>
+<script src="monsters.js"></script>
+<script src="swords.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
