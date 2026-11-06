@@ -7,12 +7,12 @@
 const LANG_KEY = 'hw_lang';
 window.KM_LANG = localStorage.getItem(LANG_KEY) || ((navigator.language || '').toLowerCase().startsWith('tr') ? 'tr' : 'en');
 document.documentElement.lang = window.KM_LANG;
-const { createEngine, newState, migrate, makeQuest, monStats, L, habitTypeName, MAX_HABITS, time: T, data: DATA } = window.KM;
+const { createEngine, newState, migrate, makeQuest, monStats, L, habitTypeName, MAX_HABITS, MAX_ITEMS, time: T, data: DATA } = window.KM;
 const DAY_END_UI = '03:00';
 const { pad, dk, fromKey, addDays, addMin, hm, mondayOf, longDate, sfx, DAYS, MONTHS } = T;
 const { ART, CARDS, CARD_BY_ART, RAR, RAR_TR, SCRAP, CRAFT, MONSTERS, CLASSES, REGIONS, BAND_COUNT, bandRegions, monById, monImg, SCHOOLS, TIERS, tierOf, REPAIR_NEED,
-  QUEST_MIN, QUEST_MAX, MASTERY_MULT, MASTERY_DMG, DMG, CARDS_PER, BURST, POTION, BONUS_STEPS, UPGRADE, CRIT_MULT, LINK_SIZE, LINK_BONUS, LINK_MAX, SWORDS, SWORD_TIERS, swordById,
-  FACTIONS, FACTION_TR, MAX_LEVEL, xpNeed, BOARD_SIZE, SHOP_DAILY, BANE, TRANSFER_FEE, DISMANTLE, ACHIEVEMENTS, LEGACY } = DATA;
+  QUEST_MIN, QUEST_MAX, MASTERY_MULT, MASTERY_DMG, DMG, CARDS_PER, POTION, CRIT_MULT, rarityOdds, AERONDIGHT, SWORD_UP, SCRAP_PER_KILL, LINK_SIZE, LINK_BONUS, LINK_MAX, LINK_RAR, LINK_EXTRA, LINK_SCHOOL, SCHOOL_CATS, SWORDS, SWORD_TIERS, swordById,
+  FACTIONS, FACTION_TR, MAX_LEVEL, xpNeed, BOARD_SIZE, SHOP_DAILY, START_KIT, cardCats, BANE, DISMANTLE, ACHIEVEMENTS, LEGACY } = DATA;
 
 /* ---------- zaman + kayıt yeri ---------- */
 const params = new URLSearchParams(location.search);
@@ -174,15 +174,20 @@ function flashEl(sel, cls) { const el = $(sel); if (!el) return; el.classList.re
 
 // görsel yüklenemezse (gwent.one erişilemezse) kırık resim yerine sade bir zemin görünsün
 document.addEventListener('error', e => { if (e.target?.tagName === 'IMG') e.target.classList.add('broken'); }, true);
-const imgTag = (src, cls = '', alt = '') => `<img class="${cls}" src="${esc(src)}" alt="${esc(alt)}" loading="lazy" referrerpolicy="no-referrer">`;
+/* dış görseller kendi sunucumuzun önbelleğinden (/img) gelir: bir kez indirilir, hofw-gorsel.db'de saklanır */
+const IMG_HOSTS = /^https:\/\/(gwent\.one|static\.wikia\.nocookie\.net|witcherdb\.com)\//;
+const imgSrc = src => (location.protocol.startsWith('http') && IMG_HOSTS.test(src || '') ? `/img?u=${encodeURIComponent(src)}` : src);
+const imgTag = (src, cls = '', alt = '') => `<img class="${cls}" src="${esc(imgSrc(src))}" alt="${esc(alt)}" loading="lazy" referrerpolicy="no-referrer">`;
 function cardHtml(c, opts = {}) {
-  return `<div class="card ${c.r}${opts.locked ? ' locked' : ''}" ${opts.noAct ? '' : 'data-act="card"'} data-a="${c.a}" title="${esc(c.n)} — ${RAR_TR[c.r]}">
+  const cats = opts.cats ? `<div class="ccats">${cardCats(c).map(x => x === opts.cats ? `<b>${esc(x)}</b>` : esc(x)).join(' · ')}</div>` : '';
+  return `<div class="card ${c.r}${opts.locked ? ' locked' : ''}" ${opts.noAct ? '' : 'data-act="card"'} data-a="${c.a}" ${opts.cats ? '' : `title="${esc(c.n)} — ${RAR_TR[c.r]}"`}>${cats}
     ${imgTag(ART(c.a, opts.q || 'low'))}
     ${opts.count > 1 ? `<span class="count">×${opts.count}</span>` : ''}
     ${opts.isNew ? `<span class="newtag">${L('YENİ', 'NEW')}</span>` : ''}
     <div class="cname">${esc(c.n)}</div></div>`;
 }
-const avatarSrc = (s = st()) => ART(s.avatar || SCHOOLS[s.school].art, 'low');
+const avatarTop = (s = st()) => (!s.avatar && SCHOOLS[s.school]?.img ? 'center top' : '');   // yerel okul görselleri dikey: yüz üstte
+const avatarSrc = (s = st()) => imgSrc(s.avatar ? ART(s.avatar, 'low') : DATA.schoolImg(s.school, 'low'));
 const SWORD_ICON = w => `<div class="sword-ph t${w.tier}"><svg viewBox="0 0 64 64"><path d="M50 6 L58 6 L58 14 L28 44 L20 36 Z" fill="currentColor" opacity=".9"/><path d="M16 34 L30 48 L26 52 L22 48 L14 56 L8 50 L16 42 L12 38 Z" fill="currentColor" opacity=".55"/></svg></div>`;
 const swordImg = w => w.img ? imgTag(w.img) : SWORD_ICON(w);
 
@@ -191,7 +196,8 @@ function renderTop() {
   const s = st(), best = s.habits.reduce((a, h) => (h.chain.len > a.chain.len ? h : a), s.habits[0]), tier = TIERS[tierOf(best.chain.len)];
   $('#heroName').textContent = s.name;
   $('#heroSchool').textContent = `${SCHOOLS[s.school].name} · ${facName(s.faction)}${s.legend ? L(' · Efsane', ' · Legend') : ''}`;
-  $('#medallion').style.backgroundImage = `url(${avatarSrc()})`;
+  $('#medallion').classList.toggle('aero-full', !!E.combatInfo().aero?.full);
+  $('#medallion').style.backgroundImage = `url(${avatarSrc()})`; $('#medallion').style.backgroundPosition = avatarTop();
   $('#hpFill').style.width = `${Math.max(0, s.hp) / E.maxHp() * 100}%`;
   $('#hpText').textContent = `${L('Can', 'HP')} ${Math.round(Math.max(0, s.hp))} / ${E.maxHp()}`;
   const need = xpNeed(s.level), max = s.level >= MAX_LEVEL;
@@ -210,7 +216,15 @@ function renderTop() {
 /* ---------- ana sayfa: bugünün alışkanlıkları ---------- */
 const RES_ICON = { success: '✅', late: '🌗', fail: '❌', rest: '⏸' };
 const typeBadge = h => `<span class="badge type-${h.type}">${esc(habitTypeName(h.type))}</span>`;
-const chainChip = h => { const t = TIERS[tierOf(h.chain.len)]; return `<small class="chain-chip" style="color:${t.color}" title="${L('Zincir', 'Chain')}: ${t.name}">⛓ ${h.chain.len}${h.chain.rust ? ' 🟤' : ''}${h.chain.repair ? ' ⚒' : ''}</small>`; };
+/* birden çok zincirde sıraya göre sayılan pay: 1 → tamamı, 0.5 → yarısı ... */
+const shareName = w => (w >= 1 ? L('tamamı', 'all of it') : w === 0.5 ? L('yarısı', 'half') : Math.abs(w - 1 / 3) < 0.01 ? L('üçte biri', 'a third') : w === 0.25 ? L('dörtte biri', 'a quarter') : L('beşte biri', 'a fifth'));
+const MULTI_CHAIN_TXT = () => L('Birden fazla alışkanlığın varsa en yüksek zincir bonusu tamamen eklenir; ikinci zincirin bonusunun yarısı, üçüncününkinin üçte biri eklenir. Örnek: Gümüş (+%20) ve Çelik (+%10) zincir → %20 + %5 = +%25 hasar.',
+  'With several habits, your highest chain bonus is added in full; half of the second chain\'s bonus and a third of the third\'s are added. Example: a Silver (+20%) and a Steel (+10%) chain → 20% + 5% = +25% damage.');
+/* zincir kademesinin ne işe yaradığı (üzerine gelince) */
+const tierTip = (t, i = TIERS.indexOf(t)) => L(
+  `${t.name} zincir (${t.at}+ halka)\n• Canavara verdiğin hasar +%${t.dmg}\n• Bu alışkanlığı tamamlayınca aldığın TP ve oren ×${t.mult}${t.min ? `\n• İlk ulaştığında en az ${RAR_TR[t.min]} bir kart` : ''}${i > 0 ? `\n• Kırılırsa ${TIERS[i - 1].name} başına (${TIERS[i - 1].at} halka) düşer; kefaretle geri gelir` : ''}`,
+  `${t.name} chain (${t.at}+ links)\n• Damage to monsters +${t.dmg}%\n• XP and crowns for completing this habit ×${t.mult}${t.min ? `\n• First time you reach it: a card of at least ${RAR_TR[t.min]} rarity` : ''}${i > 0 ? `\n• If it breaks it drops to the start of ${TIERS[i - 1].name} (${TIERS[i - 1].at} links); atonement brings it back` : ''}`);
+const chainChip = h => { const t = TIERS[tierOf(h.chain.len)]; return `<small class="chain-chip" style="color:${t.color}" title="${esc(tierTip(t))}">⛓ ${h.chain.len}${h.chain.rust ? ' 🟤' : ''}${h.chain.repair ? ' ⚒' : ''}</small>`; };
 function habitProgress(h) {
   const pct = Math.min(100, h.progress / h.days * 100);
   return `<div class="bar qbar thin"><div class="fill" style="width:${pct}%"></div><span>${h.status === 'mastery' ? L(`Edinildi · ustalık ×${MASTERY_MULT}`, `Formed · mastery ×${MASTERY_MULT}`) : L(`${h.progress} / ${h.days} gün`, `${h.progress} / ${h.days} days`)}</span></div>`;
@@ -221,13 +235,31 @@ function lastResult(h, k) {
   if (!d?.result) return '';
   const when = prev === dk(now()) ? L('bugün', 'today') : prev === addDays(dk(now()), -1) ? L('dün', 'yesterday') : longDate(prev);
   const R = { success: L('tamamlandı', 'done'), late: L('gecikti', 'late'), fail: L('kaçırıldı', 'missed'), rest: L('dinlenme', 'rest') };
-  return `<div class="hc-last ${d.result}">${RES_ICON[d.result]} ${when}: ${R[d.result]}${d.check ? ` (${hm(new Date(d.check))})` : ''}${d.count != null ? ` · ${d.count}/${h.count?.target}` : ''}</div>`;
+  return `<div class="hc-last ${d.result}">${RES_ICON[d.result]} ${when}: ${R[d.result]}${d.check && h.type !== 'count' ? ` (${hm(new Date(d.check))})` : ''}</div>`;
+}
+/* alt görev listesi: işaretlenebilir (gün tamamlandıysa sadece gösterim) */
+function subList(h, day, readOnly = false) {
+  if (!h.items?.length) return '';
+  const done = new Set(day.done || []);
+  return `<div class="subtasks">${h.items.map(x => readOnly
+    ? `<span class="sub ${done.has(x) ? 'done' : ''}">${done.has(x) ? '☑' : '☐'} ${esc(x)}</span>`
+    : `<button type="button" class="sub ${done.has(x) ? 'done' : ''}" data-act="subtoggle" data-h="${h.id}" data-item="${esc(x)}" title="${done.has(x) ? L('İşareti kaldır', 'Untick') : L('Yaptım', 'Done')}">${done.has(x) ? '☑' : '☐'} ${esc(x)}</button>`).join('')}</div>`;
 }
 function habitCard(h, n) {
-  const hid = h.id, k = E.upcoming(n, hid), w = E.W(k, hid), ph = E.phase(k, n, hid), day = h.entries[k] || {}, rest = E.isRest(k);
+  const hid = h.id;
+  let k = E.upcoming(n, hid);
+  // gündüz alışkanlıkları: bugün tamamlandıysa gün bitene kadar bugünü (tamamlanmış haliyle) göster, yarına atlama
+  const td = dk(n);
+  if (h.type !== 'sleep' && k > td && h.entries[td]?.result) k = td;
+  const w = E.W(k, hid), ph = E.phase(k, n, hid), day = h.entries[k] || {}, rest = E.isRest(k);
   const inTime = n <= w.checkEnd, early = n < w.checkStart;
   let body = '';
-  if (h.type === 'sleep') {
+  if (h.type !== 'sleep' && day.result) {
+    const R = { success: L('Tamamlandı', 'Done'), late: L('Gecikti', 'Late'), fail: L('Kaçırıldı', 'Missed'), rest: L('Dinlenme', 'Rest') };
+    const goal = h.count?.target, c = day.count || 0, unit = esc(h.count?.unit || '');
+    body = `${subList(h, day, true)}${h.type === 'count' ? `<div class="bar qbar thin count"><div class="fill" style="width:${Math.min(100, c / goal * 100)}%"></div><span>${c} / ${goal} ${unit}</span></div>` : ''}
+      <div class="hc-done">${RES_ICON[day.result]} ${R[day.result]}${day.check ? ` (${hm(new Date(day.check))})` : ''} · ${L('Sıradaki gün yarın başlıyor.', 'The next day starts tomorrow.')}</div>`;
+  } else if (h.type === 'sleep') {
     const bed = day.med ? `${L('Yatış', 'Bed')} ${hm(new Date(day.med))} ${day.medOnTime ? '✓' : L('· geç', '· late')}` : `${L('Yatış', 'Bed')} ${h.sleep.bedStart}–${h.sleep.bedEnd}`;
     const info = `<small class="muted">${bed} · ${L('Kalkış', 'Wake')} ${hm(w.checkStart)}–${hm(w.checkEnd)}</small>`;
     if (ph === 'day') body = `${info}<div class="hc-state">${L(`Yatış hazırlığı ${sfx(hm(w.prepOpen), 'da')} açılır (${fmtDur(w.prepOpen - n)} sonra).`, `Bedtime prep opens at ${hm(w.prepOpen)} (in ${fmtDur(w.prepOpen - n)}).`)}</div>`;
@@ -242,13 +274,22 @@ function habitCard(h, n) {
     const info = `<small class="muted">${L('Aralık', 'Window')} ${hm(w.checkStart)}–${hm(w.checkEnd)} · ${L('tolerans', 'tolerance')} ${h.lateMin} ${L('dk', 'min')}</small>`;
     body = `${info}<div class="hc-state">${early ? L(`Aralık ${fmtDur(w.checkStart - n)} sonra başlıyor; erken yapmak da sayılır.`, `The window starts in ${fmtDur(w.checkStart - n)}; doing it early counts too.`) : inTime ? L(`Aralığın bitmesine ${fmtDur(w.checkEnd - n)} var.`, `${fmtDur(w.checkEnd - n)} left in the window.`) : L('Aralık bitti: gecikme sayılır.', 'The window is over: it counts as late.')}</div>
       <button class="btn ${inTime || rest ? '' : 'red'}" data-act="check" data-h="${hid}">${L('✔ Tamamladım', '✔ Done')}</button>`;
+  } else if (h.type === 'check' && h.items?.length) {
+    const n = (day.done || []).filter(x => h.items.includes(x)).length;
+    body = `<small class="muted">${L(`Gün içinde, hepsini işaretle · gece ${DAY_END_UI}'e kadar`, `During the day, tick them all · until ${DAY_END_UI} at night`)}</small>
+      <div class="bar qbar thin count"><div class="fill" style="width:${n / h.items.length * 100}%"></div><span>${n} / ${h.items.length}</span></div>
+      ${subList(h, day)}
+      <div class="hc-state">${inTime ? L(`${longDate(k)} için açık.`, `Open for ${longDate(k)}.`) : L('Gün bitti: gecikme sayılır.', 'The day is over: it counts as late.')}</div>`;
   } else if (h.type === 'check') {
     body = `<small class="muted">${L(`Gün içinde herhangi bir saatte · gece ${DAY_END_UI}'e kadar`, `Any time during the day · until ${DAY_END_UI} at night`)}</small>
       <div class="hc-state">${inTime ? L(`${longDate(k)} için açık.`, `Open for ${longDate(k)}.`) : L('Gün bitti: gecikme sayılır.', 'The day is over: it counts as late.')}</div>
       <button class="btn ${inTime || rest ? '' : 'red'}" data-act="check" data-h="${hid}">${L('✔ Yaptım', '✔ Did it')}</button>`;
   } else if (h.type === 'count') {
     const c = day.count || 0, goal = h.count.target, unit = esc(h.count.unit || '');
-    body = `<small class="muted">${L(`Günlük hedef ${goal} ${unit} · yarısı gecikme sayılır`, `Daily target ${goal} ${unit} · half counts as late`)}</small>
+    if (h.items?.length) body = `<small class="muted">${L(`Günlük hedef: ${goal} alt görev · yarısı gecikme sayılır`, `Daily target: ${goal} sub-tasks · half counts as late`)}</small>
+      <div class="bar qbar thin count"><div class="fill" style="width:${Math.min(100, c / goal * 100)}%"></div><span>${c} / ${goal}</span></div>
+      ${subList(h, day)}`;
+    else body = `<small class="muted">${L(`Günlük hedef ${goal} ${unit} · yarısı gecikme sayılır`, `Daily target ${goal} ${unit} · half counts as late`)}</small>
       <div class="bar qbar thin count"><div class="fill" style="width:${Math.min(100, c / goal * 100)}%"></div><span>${c} / ${goal} ${unit}</span></div>
       <div class="row count-row"><button class="btn sm ghost" data-act="addcount" data-h="${hid}" data-n="-1">−1</button>
         <button class="btn sm" data-act="addcount" data-h="${hid}" data-n="1">+1</button>
@@ -259,7 +300,7 @@ function habitCard(h, n) {
     <div class="hc-head"><b>${esc(h.name)}</b>${typeBadge(h)}${chainChip(h)}<span class="hc-date muted">${h.type === 'sleep' ? L(`${longDate(k)} sabahı`, `Morning of ${longDate(k)}`) : longDate(k)}</span></div>
     ${habitProgress(h)}
     ${rest ? `<div class="hc-rest">⏸ ${L('Dinlenme günü: yaparsan ödül alırsın, yapmazsan ceza yok.', 'Rest day: do it for rewards, skip it with no penalty.')}</div>` : ''}
-    ${lastResult(h, k)}
+    ${day.result ? '' : lastResult(h, k)}
     <div class="hc-body">${body}</div>
   </div>`;
 }
@@ -290,10 +331,31 @@ function renderContract() {
 
 /* ---------- av: aktif kontrat + kontrat tabelası ---------- */
 const bandBossNames = () => E.bandInfo().regions.filter(r => E.bossAvailable(r)).map(r => monById(REGIONS[r].boss).name).join(' / ') || '—';
+const dmgRange = () => `${Math.round(E.playerStats().dph)}`;
+/* hasar dökümü (üzerine gelince) */
+function dmgTip() {
+  const ps = E.playerStats(), b = ps.bonus, r = n => Math.round(n * 10) / 10;
+  const lines = [
+    L(`Saatlik vuruş = (seviye gücü + gümüş kılıç) × (1 + bonus)${ps.buf ? ' × odak' : ''}${ps.deb ? ' × ceza' : ''}${ps.wounded ? ' × yaralı' : ''}`,
+      `Hourly hit = (level power + silver sword) × (1 + bonus)${ps.buf ? ' × focus' : ''}${ps.deb ? ' × penalty' : ''}${ps.wounded ? ' × wounded' : ''}`),
+    L(`• Seviye gücü: ${r(ps.level)}`, `• Level power: ${r(ps.level)}`),
+    b.swordName ? L(`• ${b.swordName}: +${b.sword}`, `• ${b.swordName}: +${b.sword}`) : L('• Gümüş kılıç yok', '• No silver sword'),
+    L(`• Bonus +%${b.pct}: ${b.parts.join(', ') || 'zincirler, kart bağları ve kılıcın avcı (bane) bonusu'}`,
+      `• Bonus +${b.pct}%: ${b.parts.join(', ') || 'chains, card links and sword bane bonus'}`),
+    L(`• Zincir +%${b.chain}: ${E.chainDamage().list.filter(x => x.dmg).map(x => x.w < 1 ? `${x.h.name}: +%${x.dmg} → ${shareName(x.w)} = +%${x.eff}` : `${x.h.name} +%${x.dmg}`).join(', ') || 'henüz Çelik zincir yok (7 halka)'}`,
+      `• Chain +${b.chain}%: ${E.chainDamage().list.filter(x => x.dmg).map(x => x.w < 1 ? `${x.h.name}: ${shareName(x.w)} of +${x.dmg}% = +${x.eff}%` : `${x.h.name} +${x.dmg}%`).join(', ') || 'no Steel chain yet (7 links)'}`),
+  ];
+  if (ps.buf) lines.push(L(`• Odak +%${ps.buf}`, `• Focus +${ps.buf}%`));
+  if (ps.deb) lines.push(L(`• Ceza −%${ps.deb} (Yorgun / Bitkin)`, `• Penalty −${ps.deb}% (Tired / Exhausted)`));
+  if (ps.wounded) lines.push(L('• Yaralı −%20 (can %50 altında)', '• Wounded −20% (HP below 50%)'));
+  if (b.crit) lines.push(L(`• Kritik: her saatlik vuruş %${b.crit} şansla ×1.5`, `• Crit: each hourly hit has a ${b.crit}% chance of ×1.5`));
+  lines.push(L(`Ortalama: ${Math.round(ps.dph)}/sa`, `Average: ${Math.round(ps.dph)}/h`));
+  return lines.join('\n');
+}
 function renderHunt() {
   const s = st(), bnd = E.bandInfo(), c = s.contract, b = E.damageBonus(), ci = E.combatInfo();
   const sv = swordById(s.swords.silver), sl = swordById(s.swords.steel);
-  const slot = (x, label) => `<div class="eq-slot" title="${x ? esc(x.name) : L('Boş', 'Empty')}">${x ? swordImg(x) : '<div class="sword-ph empty">—</div>'}<small>${label}${x && E.upLevel(x.id) ? ' +' + E.upLevel(x.id) : ''}</small></div>`;
+  const slot = (x, label) => `<div class="eq-slot" title="${x ? esc(x.name) : L('Boş', 'Empty')}">${x ? swordImg(x) : '<div class="sword-ph empty">—</div>'}<small>${label}${x ? ` ${L('Sv', 'Lv')} ${E.swordLv(x.id)}` : ''}</small></div>`;
   const dur = h => fmtDur(h * 3600000);
   let active = `<p class="muted">${L('Aktif kontrat yok. Haritadan bir ilan panosu açıp kontrat seç; seçmezsen panodaki ilk iş kendiliğinden alınır.', "No active contract. Open a notice board from the map and pick one; otherwise the first job on the board is taken automatically.")}</p>`;
   if (c) {
@@ -304,43 +366,54 @@ function renderHunt() {
         <h3>${c.elite ? `<span class="badge elite">${L('ELİT', 'ELITE')}</span> ` : ''}${esc(m.name)} ${m.boss ? '<span class="badge red">BOSS</span>' : ''}</h3>
         <small class="muted">${esc(REGIONS[m.region]?.name || '')} · ${esc(cls.tr || m.cls)} · ${L(`Ödül ${ms.gold} oren, ${ms.xp} TP`, `Reward ${ms.gold} crowns, ${ms.xp} XP`)}</small>
         <div class="bar mon" style="margin:10px 0"><div class="fill" style="width:${Math.max(0, c.hp) / c.max * 100}%"></div><span>${Math.ceil(c.hp)} / ${c.max}</span></div>
-        <div class="cb-stats"><span title="${L('Senin saatlik hasarın', 'Your damage per hour')}">⚔ ${ci.dph}/${L('sa', 'h')}</span>
+        <div class="cb-stats"><span title="${esc(dmgTip())}">⚔ ${dmgRange()}/${L('sa', 'h')}</span>
           <span title="${L('Görevinde başarısız olursan canavarın vuruşu: gecikme / kaçırma', 'What the monster hits you for if you fail a quest: late / missed')}">🩸 −${ci.hitLate} / −${ci.hitMiss}</span>
           ${ci.mode === 'fight' && ci.eta != null ? `<span title="${L('Bu hızla kalan süre', 'Time left at this pace')}">⏳ ~${dur(ci.eta)}</span>` : ''}</div>
+        ${ci.aero ? `<div class="aero-charge ${ci.aero.full ? 'full' : ''}" title="${esc(DATA.UNIQUE_BY_ID.aerondight.desc)}"><span>✨ Aerondight ${ci.aero.charge}/${ci.aero.max} · +${L('%' + ci.aero.pct, ci.aero.pct + '%')}${ci.aero.full ? L(` · Göl Hanımı'nın Darbesi ${ci.aero.next} vuruş sonra`, ` · Lady's Strike in ${ci.aero.next} hits`) : L(` · sonraki şarj ${ci.aero.toNext} saat sonra`, ` · next charge in ${ci.aero.toNext} h`)}</span><div class="bar"><div class="fill" style="width:${ci.aero.charge / ci.aero.max * 100}%"></div></div></div>` : ''}
         <p class="flavor">${esc(m.lore)}</p>
+        <button class="btn sm ghost" data-act="regions" title="${L('Panodan başka bir kontrat seçersen bu kontratın ilerlemesi sıfırlanır.', "Picking another contract from a board resets this contract's progress.")}">🔁 ${L('Kontratı değiştir', 'Change contract')}</button>
       </div></div>`;
   }
   const status = ci.mode === 'recover' ? `<div class="cb-status recover">🩹 ${L(`Yenildin; ${sfx(hm(new Date(ci.until)), 'e')} kadar toparlanıyorsun, sonra tam canla ava dönersin.`, `You were defeated; recovering until ${hm(new Date(ci.until))}, then you return at full HP.`)}</div>`
     : c ? `<div class="cb-status fight">⚔ ${L('Avdasın; uygulama kapalıyken de devam eder. Canavar sana sadece görevlerinde başarısız olunca vurur.', 'Hunting; it continues while the app is closed. The monster only hits you when you fail a quest.')}</div>` : '';
-  const effects = ci.effects.length ? `<div class="cb-effects">${ci.effects.map(e => `<span class="effect ${e.kind}" title="${esc(e.src || '')}">${e.kind === 'tired' ? '😩 ' + L('Yorgun', 'Tired') : '🥀 ' + L('Bitkin', 'Exhausted')} −${e.pct}% · ${fmtDur(new Date(e.until) - now())}</span>`).join('')}
+  const wound = ci.wounded ? `<span class="effect exhausted" title="${L('Canın %50 altında', 'HP below 50%')}">🩸 ${L('Yaralı', 'Wounded')} −20%</span>` : '';
+  const effects = ci.effects.length || wound ? `<div class="cb-effects">${wound}${ci.effects.map(e => `<span class="effect ${e.kind}" title="${esc(e.src || '')}">${e.kind === 'tired' ? '😩 ' + L('Yorgun', 'Tired') + ` −${e.pct}%` : e.kind === 'focus' ? '🎯 ' + L('Odak', 'Focus') + ` +${e.pct}%` : e.kind === 'thunder' ? `⚡ Thunderbolt +${e.pct}%` : e.kind === 'early' || e.kind === 'discipline' ? `✦ ${esc(DATA.UNIQUE_BY_ID[e.kind].name)} +${e.pct}%` : '🥀 ' + L('Bitkin', 'Exhausted') + ` −${e.pct}%`} · ${fmtDur(new Date(e.until) - now())}</span>`).join('')}
       ${ci.deb ? `<small class="muted">${L(`Toplam hasar cezası −%${ci.deb}`, `Total damage penalty −${ci.deb}%`)}</small>` : ''}</div>` : '';
   const potions = `<div class="cb-potions">
-      <span title="${L(`İçince +${ci.potionHeal} can. Can kendiliğinden dolmaz.`, `Drinking gives +${ci.potionHeal} HP. HP doesn't refill on its own.`)}">🧪 Swallow <b>${ci.potions}/${ci.potionCap}</b></span>
+      <span title="${L(`İçince +${ci.potionHeal} can. Can avda saatte %${+(ci.regen.fight * 100).toFixed(2)} dolar; yenilince saatte %${Math.round(ci.regen.idle * 100)} toparlanırsın.`, `Drinking gives +${ci.potionHeal} HP. HP regenerates ${+(ci.regen.fight * 100).toFixed(2)}%/h while hunting; after a defeat you recover ${Math.round(ci.regen.idle * 100)}%/h.`)}">🧪 Swallow <b>${ci.potions}/${ci.potionCap}</b></span>
       <button class="btn sm" data-act="drink" ${ci.potions < 1 || s.hp >= E.maxHp() ? 'disabled' : ''} title="+${ci.potionHeal} ${L('can', 'HP')}">🧪 ${L('İç', 'Drink')}</button>
       <button class="btn sm ghost" data-act="buy" data-id="swallow" ${ci.potions >= ci.potionCap || s.gold < ci.potionPrice ? 'disabled' : ''}>${L('Al', 'Buy')} · ${ci.potionPrice} 🪙</button>
-      <span title="${L('Kaçırılan bir günde kendiliğinden içilir: canavar vuramaz, Bitkin olmazsın', 'Drunk automatically on a missed day: the monster can\'t strike and you don\'t become Exhausted')}">🍯 White Honey <b>${ci.honey}</b></span></div>`;
+      <span title="${L('Kaçırılan bir günde kendiliğinden içilir: canavar vuramaz, Bitkin olmazsın', 'Drunk automatically on a missed day: the monster can\'t strike and you don\'t become Exhausted')}">🍯 White Honey <b>${ci.honey}</b></span></div>
+    <div class="cb-potions">
+      <span title="${L(`${DATA.THUNDER.hours} saat boyunca hasar +%${DATA.THUNDER.pct}`, `+${DATA.THUNDER.pct}% damage for ${DATA.THUNDER.hours} hours`)}">⚡ Thunderbolt <b>${ci.thunder}/${ci.thunderCap}</b></span>
+      <button class="btn sm" data-act="thunder" ${ci.thunder < 1 ? 'disabled' : ''}>⚡ ${L('İç', 'Drink')}</button>
+      <button class="btn sm ghost" data-act="buy" data-id="thunder" ${ci.thunder >= ci.thunderCap || s.gold < ci.thunderPrice ? 'disabled' : ''}>${L('Al', 'Buy')} · ${ci.thunderPrice} 🪙</button>
+      <span title="${L(`Canavara ${ci.dancingMin}–${ci.dancingMax} hasar (3–10 saatlik); canın −${ci.dancingCost}`, `${ci.dancingMin}–${ci.dancingMax} damage to the monster (3–10 hours' worth); costs you ${ci.dancingCost} HP`)}">✴ Dancing Star <b>${ci.dancing}/${ci.dancingCap}</b></span>
+      <button class="btn sm" data-act="dancing" ${ci.dancing < 1 || !c || ci.mode === 'recover' || s.hp <= ci.dancingCost ? 'disabled' : ''} title="${L(`${ci.dancingMin}–${ci.dancingMax} hasar · −${ci.dancingCost} can (canın %50'nin üstünde olmalı)`, `${ci.dancingMin}–${ci.dancingMax} damage · −${ci.dancingCost} HP (HP must be above 50%)`)}">✴ ${L('At', 'Throw')} · ${ci.dancingMin}–${ci.dancingMax}</button>
+      <button class="btn sm ghost" data-act="buy" data-id="dancing" ${ci.dancing >= ci.dancingCap || s.gold < ci.dancingPrice ? 'disabled' : ''}>${L('Al', 'Buy')} · ${ci.dancingPrice} 🪙</button></div>`;
   const queue = (s.queue || []).length ? `<div class="cb-queue"><small class="muted">${L('Av sırası', 'Hunt queue')}:</small> ${s.queue.map(id => `<span class="q-item">${esc(monById(id).name)} <button class="btn sm ghost" data-act="unqueue" data-id="${id}" title="${L('Sıradan çıkar', 'Remove')}">✕</button></span>`).join('')}</div>` : '';
   const atCap = E.atCap();
   const levelInfo = s.legend ? L("Efsanesin. Bu karakterle devam edebilirsin: kestiğin canavarlar ve bölge boss'ları elit olarak geri dönüyor, TP Ün (★) kazandırıyor. İstersen Okul'da yeniden doğabilirsin.", "You are a legend. Keep playing this character: slain monsters and region bosses return as elites, and XP earns Renown (★). You can also be reborn in the School.")
     : atCap ? L(`Seviye sınırındasın (${bnd.max}). İlerlemek için bu kademenin boss'larından birini yen: ${bandBossNames()}.`, `You're at the level cap (${bnd.max}). Defeat one of this tier's bosses to advance: ${bandBossNames()}.`)
     : L(`Seviye ${s.level}. Bu kademenin sınırı ${bnd.max}; sınıra gelince boss'lar açılır.`, `Level ${s.level}. This tier caps at ${bnd.max}; at the cap the bosses unlock.`);
-  const dph = ci.dph;
-  $('#monsterPanel').innerHTML = `<div class="region-head"><div><small class="muted">${L('KADEME', 'TIER')} ${bnd.i + 1}/${BAND_COUNT} · ${L('Seviye', 'Levels')} ${bnd.min}–${bnd.max}</small><h2 style="margin:0">${esc(bandLabel(bnd.i))}</h2></div></div>
-    <p class="muted" style="margin:4px 0 12px;font-size:.9rem">${levelInfo}</p>
+  $('#regionPanel').innerHTML = `<div class="region-strip">
+      <div class="rs-main"><small class="muted">${L('KADEME', 'TIER')} ${bnd.i + 1}/${BAND_COUNT} · ${L('Seviye', 'Levels')} ${bnd.min}–${bnd.max}</small><h2 style="margin:0">${esc(bandLabel(bnd.i))}</h2></div>
+      <p class="muted rs-info">${levelInfo}</p>
+      <div class="row rs-act"><button class="btn ${c ? '' : 'big'}" data-act="regions">🗺 ${L('Harita ve ilan panoları', 'Map and notice boards')}</button>
+        ${bnd.regions.some(r => E.bossAvailable(r)) ? `<span class="badge red">${L('Boss açık', 'Boss open')}: ${esc(bandBossNames())}</span>` : ''}</div></div>`;
+  $('#monsterPanel').innerHTML = `<small class="muted">${L('AKTİF KONTRAT', 'ACTIVE CONTRACT')}</small>
     ${active}${status}${effects}${potions}${queue}
-    <div class="row" style="margin:10px 0"><button class="btn ${c ? '' : 'big'}" data-act="regions">🗺 ${L('Harita ve ilan panoları', 'Map and notice boards')}</button>
-      ${bnd.regions.some(r => E.bossAvailable(r)) ? `<span class="badge red">${L('Boss açık', 'Boss open')}: ${esc(bandBossNames())}</span>` : ''}</div>
     <div class="eq-row">${slot(sv, L('Gümüş', 'Silver'))}${slot(sl, L('Çelik', 'Steel'))}
-      <div class="eq-info"><div>${L('Hasar bonusu', 'Damage bonus')}: <b class="mult">${L(`+%${b.pct}`, `+${b.pct}%`)}</b>${b.raw > b.pct ? ` <small title="${L("İlk %60 tam, %60–120 arası %75'i, %120–180 arası %45'i, sonrası %20'si sayılır", 'The first 60% counts fully, 60–120% at 75%, 120–180% at 45%, beyond that at 20%')}">${L(`(ham +%${b.raw}, azalan getiri)`, `(raw +${b.raw}%, diminishing returns)`)}</small>` : ''}${b.crit ? ` · ${L('Kritik', 'Crit')} <b class="mult">${L(`%${b.crit}`, `${b.crit}%`)}</b>` : ''}</div>
-        <small class="muted">${b.parts.length ? esc(b.parts.join(' · ')) : L('Kılıç, zincirler ve kart bağları hasarını artırır.', 'Swords, chains and card links raise your damage.')}</small>
-        <small class="muted" style="display:block">${L(`Başarı anında ek vuruş: alışkanlık ~${Math.round(dph * BURST.habit)}, yatış ~${Math.round(dph * BURST.prep)}, yan görev ~${Math.round(dph * BURST.side)} hasar.`, `Bonus strike on success: habit ~${Math.round(dph * BURST.habit)}, bedtime ~${Math.round(dph * BURST.prep)}, side quest ~${Math.round(dph * BURST.side)} damage.`)}</small>
+      <div class="eq-info" title="${esc(dmgTip())}"><div>${L('Saatlik hasar', 'Damage per hour')}: <b class="mult">${dmgRange()}</b>
+          · ${L('Bonus', 'Bonus')} <b class="mult">${L(`+%${b.pct}`, `+${b.pct}%`)}</b>${b.chain ? ` <small>${L(`(zincir +%${b.chain} dahil)`, `(incl. chain +${b.chain}%)`)}</small>` : ''}${b.crit ? ` · ${L('Kritik', 'Crit')} <b class="mult">${L(`%${b.crit}`, `${b.crit}%`)}</b>` : ''}</div>
+        <small class="muted">${L('Ayrıntı için üzerine gel.', 'Hover for details.')}${b.parts.length ? ' · ' + esc(b.parts.join(' · ')) : ''}</small>
         ${(() => { if (!c) return ''; const m = monById(c.id), bs = E.bestSwordFor('silver', m), bt = E.bestSwordFor('steel', m);
           const better = (bs && bs.id !== s.swords.silver) || (bt && bt.id !== s.swords.steel);
           return better ? `<div class="row" style="margin-top:6px"><small class="mult">${L('Bu canavara karşı daha iyi bir kılıcın var.', 'You have a better sword against this monster.')}</small><button class="btn sm" data-act="equipbest">⚔ ${L('En iyisini kuşan', 'Equip the best')}</button></div>` : ''; })()}</div></div>
-    <p class="hint">${L('Av sürekli akar ve canavarlar sana kendiliğinden vurmaz: sadece bir görevi geciktirince (yarım) ya da kaçırınca (tam) vururlar. Can kendiliğinden dolmaz; Swallow içmen gerekir. Canın biterse yenilirsin ve canavarın canı tamamen dolar. Zincirlerin hasarını artırır; gecikmek "Yorgun", kaçırmak "Bitkin" de yapar.',
-      'The hunt never stops and monsters don\'t hit you on their own: they only strike when you are late on a quest (half) or miss it (full). HP doesn\'t refill by itself; drink a Swallow. If your HP runs out you are defeated and the monster heals completely. Your chains raise your damage; being late also makes you "Tired", missing "Exhausted".')}</p>`;
+    <p class="hint">${L('Av sürekli akar ve canavarlar sana kendiliğinden vurmaz: sadece bir görevi geciktirince (yarım) ya da kaçırınca (tam) vururlar. Can avda saatte yaklaşık %0,3 (okula göre %0,2–0,5), dolar; yenilince saatte %15 (Bear %30) toparlanırsın. Acil durumda Swallow iç. Canın biterse yenilirsin: canavarın canı dolar, orenin %10 kadarı gider. Zincirlerin hasarını artırır; gecikmek "Yorgun", kaçırmak "Bitkin" de yapar.',
+      'The hunt never stops and monsters don\'t hit you on their own: they only strike when you are late on a quest (half) or miss it (full). HP regenerates about 0.3%/h while hunting (0.2–0.5% by school) ; after a defeat you recover 15%/h (Bear 30%). Drink a Swallow in an emergency. If your HP runs out you are defeated: the monster heals fully and you lose 10% of your crowns. Your chains raise your damage; being late also makes you "Tired", missing "Exhausted".')}</p>`;
 }
-const strLabel = m => m.boss ? 'Boss' : m.str < 0.7 ? L('Zayıf', 'Weak') : m.str < 0.86 ? L('Orta', 'Medium') : L('Güçlü', 'Strong');
+const strLabel = m => m.boss ? (REGIONS[m.region]?.tier >= 5 ? L('Efsanevi boss', 'Legendary boss') : 'Boss') : m.str < 0.7 ? L('Zayıf', 'Weak') : m.str < 0.86 ? L('Orta', 'Medium') : L('Güçlü', 'Strong');
 const bandLabel = b => bandRegions(b).map(r => REGIONS[r].name).join(' / ');
 /* ---------- harita: kendi çizdiğimiz Kıta haritası; bölgeler sınırlarıyla tıklanır ---------- */
 const KMAP = window.KM_MAP || { w: 1000, h: 870, land: '', isles: [], rivers: [] };
@@ -436,6 +509,7 @@ function showBoard(r) {
       <div class="note-img">${imgTag(monImg(e.m, 'low'))}</div>
       <b>${e.elite ? L('Elit ', 'Elite ') : ''}${esc(e.m.name)}</b>
       <small>❤ ${e.stats.hp} · 🪙 ${e.stats.gold}</small>
+      ${e.killed ? `<span class="slain"><span class="skull">💀</span>${L('ÖLDÜ', 'SLAIN')}</span>` : ''}
       ${e.boss ? '<span class="seal"></span>' : ''}${e.active ? `<span class="pinned">${L('Aktif', 'Active')}</span>` : ''}</div>`).join('');
   openModal(`<div class="row" style="justify-content:space-between;gap:8px">
       <div><small class="muted">${esc(reg.game || '')} · ${L('Seviye', 'Levels')} ${reg.min}–${reg.max}</small><h2 style="margin:0">${esc(reg.name)}</h2></div>
@@ -447,6 +521,7 @@ function showBoard(r) {
 }
 
 function renderChain() {
+  const RN = st().school === 'griffin' ? 1 : REPAIR_NEED;
   const names = { ok: L('başarılı', 'success'), rust: L('gecikme (paslı)', 'late (rusty)'), rest: L('dinlenme', 'rest'), break: L('kırıldı', 'broken') };
   const cd = E.chainDamage(), w = new Map(cd.list.map(x => [x.h.id, x]));
   const rows = st().habits.map(h => {
@@ -456,17 +531,18 @@ function renderChain() {
       ? `<span class="link break" title="${longDate(l.d)}: ${names.break}">⚡</span>`
       : `<span class="link ${l.t}" title="${longDate(l.d)}: ${names[l.t]}"></span>`).join('');
     let status = '';
-    if (c.repair) status += `<div class="chain-note repair">⚒ <b>${L('Kefaret', 'Atonement')} ${c.repair.got}/${REPAIR_NEED}:</b> ${L(`Sonraki ${REPAIR_NEED - c.repair.got} günü başarırsan zincir <b>${c.repair.preLen + REPAIR_NEED}</b> halkaya döner.`, `Succeed the next ${REPAIR_NEED - c.repair.got} days and the chain returns to <b>${c.repair.preLen + REPAIR_NEED}</b> links.`)}</div>`;
+    if (c.repair) status += `<div class="chain-note repair">⚒ <b>${L('Kefaret', 'Atonement')} ${c.repair.got}/${RN}:</b> ${L(`Sonraki ${RN - c.repair.got} günü başarırsan zincir <b>${c.repair.preLen + RN}</b> halkaya döner.`, `Succeed the next ${RN - c.repair.got} days and the chain returns to <b>${c.repair.preLen + RN}</b> links.`)}</div>`;
     if (c.rust) status += `<div class="chain-note rust">🟤 <b>${L('Paslı halka', 'Rusty link')}:</b> ${L('Bir sonraki gecikme zinciri kırar.', 'The next late day breaks the chain.')}</div>`;
     return `<div class="chain-row">
       <div class="cr-head"><b>${esc(h.name)}</b> <span class="chain-len" style="color:${tier.color}">${L(`${c.len} halka`, `${c.len} ${c.len === 1 ? 'link' : 'links'}`)} · ${tier.name}</span>
-        <small class="muted">${L(`En uzun ${c.best} · ödül ×${tier.mult}`, `Best ${c.best} · reward ×${tier.mult}`)}${x && x.dmg ? ` · ${L('hasar', 'damage')} ${L(`+%${x.eff}`, `+${x.eff}%`)}${x.w < 1 ? ` <span title="${L('Zincir sırasına göre ağırlık', 'Weight by chain rank')}">(×${+x.w.toFixed(2)})</span>` : ''}` : ''}</small></div>
-      <div class="bar chainbar thin"><div class="fill" style="width:${prog}%;background:${next ? next.color : tier.color}"></div><span>${next ? L(`${next.name} için ${next.at - c.len} halka`, `${next.at - c.len} links to ${next.name}`) : L('En üst malzeme', 'Top material')}</span></div>
+        <small class="muted" title="${esc(tierTip(tier))}">${(() => { const d = x ? +x.dmg.toFixed(1) : tier.dmg, ms = h.status === 'mastery' && tier.dmg ? L(` (ustalıkta %${tier.dmg} yerine)`, ` (instead of ${tier.dmg}%, in mastery)`) : '';
+          return L(`En uzun ${c.best} · hasar +%${d}${ms} · ödül ×${tier.mult}`, `Best ${c.best} · damage +${d}%${ms} · reward ×${tier.mult}`); })()}${x && x.dmg && x.w < 1 ? ` <span title="${esc(MULTI_CHAIN_TXT())}">(${L(`bu zincirin ${shareName(x.w)} eklenir: +%${x.eff}`, `${shareName(x.w)} of it is added: +${x.eff}%`)})</span>` : ''}</small></div>
+      <div class="bar chainbar thin"><div class="fill" style="width:${prog}%;background:${next ? next.color : tier.color}"></div><span title="${next ? esc(tierTip(next)) : ''}">${next ? L(`${next.name} için ${next.at - c.len} halka (hasar +%${next.dmg}, ödül ×${next.mult})`, `${next.at - c.len} links to ${next.name} (damage +${next.dmg}%, reward ×${next.mult})`) : L('En üst malzeme', 'Top material')}</span></div>
       <div class="chain" style="--c:${tier.color}">${links || `<small class="muted">${L('İlk halka, ilk başarılı günle dövülecek.', 'The first link will be forged on your first successful day.')}</small>`}</div>${status}</div>`;
   }).join('');
   $('#chainPanel').innerHTML = `<div class="chain-head"><div><h2>${L('Zincirler', 'Chains')}</h2>
-      <small>${L(`Zincir hasar bonusu: <b class="mult">+%${cd.total}</b> · en güçlü zincir tam, ikincisi yarım, üçüncüsü üçte bir sayılır.`, `Chain damage bonus: <b class="mult">+${cd.total}%</b> · your strongest chain counts fully, the second half, the third a third.`)}</small></div>
-      <div class="tier-row">${TIERS.map(x => `<div class="tier on" style="--c:${x.color}" title="${x.name}: ${x.at}+ ${L('halka', 'links')} · ×${x.mult}, +${x.dmg}%"><span class="tier-dot"></span><small>${x.name}<br>${x.at}</small></div>`).join('')}</div></div>
+      <small>${L(`Zincirlerinden gelen hasar: <b class="mult">+%${cd.total}</b>. Kademelerin üzerine gelince ne verdiklerini görürsün.`, `Damage from your chains: <b class="mult">+${cd.total}%</b>. Hover a tier to see what it gives.`)}${st().habits.length > 1 ? `<br>${MULTI_CHAIN_TXT()}` : ''}</small></div>
+      <div class="tier-row">${TIERS.map(x => `<div class="tier on" style="--c:${x.color}" title="${esc(tierTip(x))}"><span class="tier-dot"></span><small>${x.name}<br>${x.at} · ${L(`+%${x.dmg}`, `+${x.dmg}%`)}</small></div>`).join('')}</div></div>
     ${rows}`;
 }
 const dayIcon = d => !d ? '' : d.result ? RES_ICON[d.result] : '';
@@ -516,6 +592,9 @@ function questForm(q, mode) {
     ${sec('window', `<label>${L('Görev aralığı (aynı gün içinde)', 'Quest window (within one day)')}</label><div class="row"><input type="time" data-q="start" value="${d.start}"> – <input type="time" data-q="end" value="${d.end}"></div>`)}
     ${sec('count', `<div class="row"><div><label>${L('Günlük hedef', 'Daily target')}</label><input type="number" data-q="target" min="1" max="10000" value="${c.target}" style="width:110px"></div>
       <div><label>${L('Birim (isteğe bağlı)', 'Unit (optional)')}</label><input data-q="unit" value="${esc(c.unit)}" placeholder="${L('bardak, sayfa, şınav…', 'glasses, pages, push-ups…')}" style="width:160px"></div></div>`)}
+    ${sec('count check', `<label>${L('Alt görevler (isteğe bağlı, her satıra bir tane)', 'Sub-tasks (optional, one per line)')}</label>
+      <textarea data-q="items" rows="4" placeholder="${L('ör. Vitamin al →\nD vitamini\nOmega 3\nB12', 'e.g. Take vitamins →\nVitamin D\nOmega 3\nB12')}">${esc((q.items || []).join('\n'))}</textarea>
+      <small class="muted">${L(`Her biri kartta ayrı işaretlenir (en fazla ${MAX_ITEMS}). Adet türünde günlük hedef alt görev sayısı olur; yaptım/yapmadım türünde hepsi işaretlenince gün tamamlanır. Yarısı yapıldıysa gecikme sayılır.`, `Each one is ticked separately on the card (up to ${MAX_ITEMS}). For count habits the daily target becomes the number of sub-tasks; for done/not-done habits the day is complete once all are ticked. Half counts as late.`)}</small>`)}
     ${sec('sleep window check', `<p class="hint">${L('Aralık bittikten sonra tolerans içinde yaparsan "gecikme", hiç yapmazsan "kaçırıldı" olur. Yaptım/yapmadım türünde gün gece 03:00\'e kadar sürer.', 'Doing it after the window, within the tolerance, is "late"; not doing it at all is "missed". For done/not-done habits the day lasts until 03:00 at night.')}</p>`)}
   </div>`;
 }
@@ -527,11 +606,13 @@ function readQuestForm(root) {
     sleep: { bedStart: v('bedStart'), bedEnd: v('bedEnd'), wakeStart: v('wakeStart'), wakeEnd: v('wakeEnd') },
     daily: { start: v('start'), end: v('end') },
     count: { target: +v('target'), unit: v('unit') || '' },
+    items: (root.querySelector('[data-q="items"]')?.value || '').split('\n').map(x => x.trim()).filter(Boolean),
   };
 }
 function habitRanges(h) {
   if (h.type === 'sleep') return `${L('Yatış', 'Bed')} ${h.sleep.bedStart}–${h.sleep.bedEnd} · ${L('Kalkış', 'Wake')} ${h.sleep.wakeStart}–${h.sleep.wakeEnd}`;
   if (h.type === 'window') return `${L('Aralık', 'Window')} ${h.daily.start}–${h.daily.end}`;
+  if (h.items?.length) return `${L('Alt görevler', 'Sub-tasks')}: ${h.items.map(esc).join(', ')}`;
   if (h.type === 'count') return `${L('Hedef', 'Target')} ${h.count.target} ${esc(h.count.unit || '')}`;
   return L('Gün içinde', 'During the day');
 }
@@ -547,8 +628,8 @@ function renderMainQuest() {
           <button class="btn red sm" data-act="habitdel" data-h="${h.id}">${h.status === 'mastery' ? L('Listeden çıkar', 'Remove') : L('Bırak', 'Abandon')}</button></span>` : ''}</div></div>
   </details>`).join('');
   $('#mainQuestPanel').innerHTML = `<h2>${L('Alışkanlıklar', 'Habits')} · ${s.habits.length}/${MAX_HABITS}</h2>
-    <p class="muted">${L(`Her alışkanlığın kendi zinciri ve hedefi var. Alışkanlığı <b>hedef gün kadar başarıyla</b> edinirsin (art arda olması gerekmez): 150 oren, 100 TP ve bir Efsanevi kart. Sonra ustalıkla sürdürür ya da listeden çıkarıp yerine yenisini eklersin. Zincirlerin hasar bonusu azalarak toplanır: en güçlüsü tam, ikincisi yarım, üçüncüsü üçte bir. Alışkanlıklar karakterden bağımsızdır; yeniden doğsan da sürer.`,
-      `Each habit has its own chain and goal. You form a habit after <b>as many successful days as its goal</b> (not necessarily in a row): 150 crowns, 100 XP and a Legendary card. Then keep it in mastery or remove it and add a new one. Chain damage bonuses stack with diminishing weight: the strongest counts fully, the second half, the third a third. Habits don't belong to the character; they carry on even if you're reborn.`)}</p>
+    <p class="muted">${L(`Her alışkanlığın kendi zinciri ve hedefi var. Alışkanlığı <b>hedef gün kadar başarıyla</b> edinirsin (art arda olması gerekmez): 150 oren, 100 TP ve bir Efsanevi kart. Sonra ustalıkla sürdürür ya da listeden çıkarıp yerine yenisini eklersin. ${MULTI_CHAIN_TXT()} Alışkanlıklar karakterden bağımsızdır; yeniden doğsan da sürer.`,
+      `Each habit has its own chain and goal. You form a habit after <b>as many successful days as its goal</b> (not necessarily in a row): 150 crowns, 100 XP and a Legendary card. Then keep it in mastery or remove it and add a new one. ${MULTI_CHAIN_TXT()} Habits don't belong to the character; they carry on even if you're reborn.`)}</p>
     ${cards}
     ${s.habits.length < MAX_HABITS ? `<details class="box" open><summary><b>＋ ${L('Yeni alışkanlık', 'New habit')}</b></summary><div class="habit-new">${questForm({ type: 'check', days: 30, lateMin: 60 }, 'new')}
       <div class="row" style="margin-top:10px"><button class="btn" data-act="questnew">${L('Alışkanlığı başlat', 'Start the habit')}</button></div></div></details>`
@@ -639,30 +720,59 @@ function renderLinks() {
   if (!facs.includes(linkFaction)) linkFaction = facs[0];
   const opts = Object.entries(E.linkOptions(linkFaction)).sort((x, y) => y[1] - x[1]);
   const links = s.links.slice().sort((x, y) => (y.cards.length >= LINK_SIZE) - (x.cards.length >= LINK_SIZE) || x.f.localeCompare(y.f));
-  $('#linksPanel').innerHTML = `<h2>${L('Kart Bağları', 'Card Links')} · ${L(`${done} tamamlandı`, `${done} complete`)}</h2>
-    <p class="muted">${L(`Aynı fraksiyondan, en az bir türü ortak olan ${LINK_SIZE} kartı birbirine bağla (ör. Scoia'tael · Elf). Tamamlanan her bağ canavara verdiğin hasarı <b>+%${LINK_BONUS}</b> artırır (en çok ${LINK_MAX} bağ sayılır). Bir kart tek bir bağda olabilir.`,
-      `Link ${LINK_SIZE} cards of the same faction that share at least one category (e.g. Scoia'tael · Elf). Each completed link raises your damage by <b>+${LINK_BONUS}%</b> (up to ${LINK_MAX} links count). A card can be in only one link.`)}</p>
+  const lsum = E.countedLinks().reduce((t, x) => t + x.v.total, 0), fav = SCHOOL_CATS[s.school] || [];
+  $('#linksPanel').innerHTML = `<h2>${L('Kart Bağları', 'Card Links')} · ${L(`${done} tamamlandı · ${s.links.length}/${LINK_MAX} bağ · toplam +%${+lsum.toFixed(1)} hasar`, `${done} complete · ${s.links.length}/${LINK_MAX} links · total +${+lsum.toFixed(1)}% damage`)}</h2>
+    <p class="muted">${L(`Aynı fraksiyondan, en az bir türü ortak olan ${LINK_SIZE} kartı birbirine bağla (ör. Scoia'tael · Elf). Bağın değeri kartların nadirliğinden gelir: Sıradan %${LINK_RAR.Common}, Nadir %${LINK_RAR.Rare}, Destansı %${LINK_RAR.Epic}, Efsanevi %${LINK_RAR.Legendary}. Beş kartın da paylaştığı her <b>ek tür</b> (ör. Human bağında hepsi Soldier da ise) +%${LINK_EXTRA}. Bağın türü okulunun sevdiği türlerdense (<b>${fav.join(', ')}</b>) bağ ×${LINK_SCHOOL}. En fazla ${LINK_MAX} bağ kurabilirsin; bir kart tek bir bağda olabilir. En iyi kombinasyonu bulmaya çalış.`,
+      `Link ${LINK_SIZE} cards of the same faction that share at least one category (e.g. Scoia'tael · Elf). A link's value comes from card rarity: Common ${LINK_RAR.Common}%, Rare ${LINK_RAR.Rare}%, Epic ${LINK_RAR.Epic}%, Legendary ${LINK_RAR.Legendary}%. Every <b>extra category</b> all five cards share (e.g. a Human link where all are also Soldiers) adds +${LINK_EXTRA}%. If the link's category is one your school favours (<b>${fav.join(', ')}</b>), the link counts ×${LINK_SCHOOL}. You can have at most ${LINK_MAX} links; a card can be in only one link. Find the best combination.`)}</p>
     <div class="box"><h3 style="margin-top:0">${L('Yeni bağ', 'New link')}</h3><div class="row">
       <select id="linkFac">${facs.map(f => `<option value="${f}" ${f === linkFaction ? 'selected' : ''}>${facName(f)}</option>`).join('')}</select>
       <select id="linkCat">${opts.length ? opts.map(([c, n]) => `<option value="${esc(c)}">${esc(c)} (${L(`${n} kartın var`, `you have ${n}`)})</option>`).join('') : `<option value="">${L('Bu fraksiyonda bağlanabilir kartın yok', 'No linkable cards in this faction')}</option>`}</select>
-      <button class="btn" data-act="newlink" ${opts.length ? '' : 'disabled'}>${L('Bağ oluştur', 'Create link')}</button></div></div>
+      <button class="btn" data-act="newlink" ${opts.length && s.links.length < LINK_MAX ? '' : 'disabled'}>${L('Bağ oluştur', 'Create link')}</button></div></div>
     ${links.length ? links.map(l => {
       const full = l.cards.length >= LINK_SIZE;
+      const favCat = fav.includes(l.cat);
+      const cardsIn = l.cards.map(a => CARD_BY_ART[a]).filter(Boolean);
+      const sharedNow = cardsIn.length ? cardCats(cardsIn[0]).filter(x => x !== l.cat && cardsIn.every(c => cardCats(c).includes(x))) : [];
+      const rarSum = cardsIn.reduce((t, c) => t + LINK_RAR[c.r], 0);
+      const byRar = RAR.map(r => [r, cardsIn.filter(c => c.r === r).length]).filter(x => x[1]).map(([r, n]) => `${n}× ${RAR_TR[r]} (+${pct(n * LINK_RAR[r])})`).join(', ');
+      const sumLine = `<p class="muted link-sum">${cardsIn.length ? `${L('Kartlar', 'Cards')}: ${byRar} = +${pct(rarSum)}` : L('Henüz kart yok.', 'No cards yet.')}${sharedNow.length ? ` · ${L('ek ortak tür', 'extra shared category')}: ${esc(sharedNow.join(', '))} (+${pct(sharedNow.length * LINK_EXTRA)}${full ? '' : L(', son karta kadar korunursa', ', if kept to the last card')})` : ''}${favCat ? ` · ${L('okul uyumu', 'school affinity')} ×${LINK_SCHOOL}` : ''}${full ? '' : ` · ${L('şu an', 'so far')} ≈ +${pct((rarSum + sharedNow.length * LINK_EXTRA) * (favCat ? LINK_SCHOOL : 1))} ${L(`(${LINK_SIZE} kart olunca sayılır)`, `(counts at ${LINK_SIZE} cards)`)}`}</p>`;
       const slots = Array.from({ length: LINK_SIZE }, (_, i) => {
         const a = l.cards[i];
-        if (a) { const c = CARD_BY_ART[a]; return `<div class="link-slot filled" data-act="unlink" data-link="${l.id}" data-a="${a}" title="${esc(c.n)} — ${L('çıkarmak için tıkla', 'click to remove')}">${cardHtml(c, { noAct: true })}</div>`; }
+        if (a) { const c = CARD_BY_ART[a], cv = LINK_RAR[c.r] * (favCat ? LINK_SCHOOL : 1);
+          return `<div class="link-slot filled" data-act="unlink" data-link="${l.id}" data-a="${a}" title="${esc(c.n)} — ${RAR_TR[c.r]}: +${pct(LINK_RAR[c.r])}${favCat ? ` ×${LINK_SCHOOL}` : ''}\n${L('Türler', 'Categories')}: ${esc(cardCats(c).join(', '))}\n${L('çıkarmak için tıkla', 'click to remove')}">${cardHtml(c, { noAct: true, cats: l.cat })}<span class="lc">+${pct(cv)}</span></div>`; }
         return `<div class="link-slot" data-act="linkpick" data-link="${l.id}" title="${L('Kart ekle', 'Add card')}">＋</div>`;
       }).join('');
-      return `<div class="link-row ${full ? 'full' : ''}"><div class="link-head"><b>${esc(facName(l.f))} · ${esc(l.cat)}</b> <small>${l.cards.length}/${LINK_SIZE}${full ? ` · <span class="mult">${L(`+%${LINK_BONUS} hasar`, `+${LINK_BONUS}% damage`)}</span>` : ''}</small>
-        <button class="btn sm ghost" data-act="dellink" data-link="${l.id}" title="${L('Bağı sil', 'Delete link')}">✕</button></div><div class="link-slots">${slots}</div></div>`;
+      const v = E.linkValue(l);
+      const tip = v ? L(`Nadirlik: +%${v.rar}${v.shared.length ? `\nEk ortak tür (${v.shared.join(', ')}): +%${v.extra}` : '\nEk ortak tür yok'}${v.fav ? `\nOkul uyumu: ×${LINK_SCHOOL}` : ''}\nToplam: +%${v.total}`,
+        `Rarity: +${v.rar}%${v.shared.length ? `\nExtra shared category (${v.shared.join(', ')}): +${v.extra}%` : '\nNo extra shared category'}${v.fav ? `\nSchool affinity: ×${LINK_SCHOOL}` : ''}\nTotal: +${v.total}%`) : '';
+      return `<div class="link-row ${full ? 'full' : ''}"><div class="link-head"><b>${esc(facName(l.f))} · ${esc(l.cat)}</b>${favCat ? ` <span class="badge gold" title="${L('Okulunun sevdiği tür', 'Your school favours this category')}">🏫 ×${LINK_SCHOOL}</span>` : ''} <small>${l.cards.length}/${LINK_SIZE}${v ? ` · <span class="mult" title="${esc(tip)}">${L(`+%${v.total} hasar`, `+${v.total}% damage`)}${v.shared.length ? ` (+${esc(v.shared.join(', '))})` : ''}</span>` : ''}</small>
+        <button class="btn sm ghost" data-act="dellink" data-link="${l.id}" title="${L('Bağı sil', 'Delete link')}">✕</button></div><div class="link-slots">${slots}</div>${sumLine}</div>`;
     }).join('') : `<p class="muted">${L('Henüz bağ yok.', 'No links yet.')}</p>`}`;
 }
+const pct = n => L(`%${+n.toFixed(2)}`, `${+n.toFixed(2)}%`);
 function showLinkPicker(linkId) {
-  const l = st().links.find(x => x.id === linkId), list = E.eligibleForLink(linkId);
-  openModal(`<h2>${esc(facName(l.f))} · ${esc(l.cat)}: ${L('kart seç', 'pick a card')}</h2>
-    ${list.length ? `<div class="cards">${list.map(c => `<div data-act="linkadd" data-link="${linkId}" data-a="${c.a}">${cardHtml(c, { noAct: true })}</div>`).join('')}</div>`
-      : `<p class="muted">${L('Bu bağa uyan, başka bir bağda olmayan kartın yok.', 'You have no cards that fit this link and are not already in another link.')}</p>`}
-    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn ghost" data-act="close">${L('Kapat', 'Close')}</button></div>`);
+  const l = st().links.find(x => x.id === linkId); if (!l) return;
+  const list = E.eligibleForLink(linkId, { includeUsed: true });
+  const fav = (SCHOOL_CATS[st().school] || []).includes(l.cat), cur = l.cards.map(a => CARD_BY_ART[a]).filter(Boolean);
+  const shared = cur.length ? cardCats(cur[0]).filter(x => x !== l.cat && cur.every(c => cardCats(c).includes(x))) : null;
+  const pick = c => {
+    const from = E.linkOfCard(c.a), keep = shared ? shared.filter(x => cardCats(c).includes(x)) : [];
+    const kept = shared && shared.length ? keep.length === shared.length : null;
+    const tip = from ? L(`${from.f} · ${from.cat} bağında. Seçersen oradan çıkarılıp bu bağa taşınır.`, `In the ${from.f} · ${from.cat} link. Picking it moves it here.`) : '';
+    return `<div class="pick ${from ? 'linked' : ''} ${kept === true ? 'keep' : kept === false ? 'breaks' : ''}" data-act="linkadd" data-link="${l.id}" data-a="${c.a}" ${tip ? `title="${esc(tip)}"` : ''}>
+      ${cardHtml(c, { noAct: true, cats: l.cat })}
+      ${from ? `<span class="lock">⛓ ${esc(from.cat)}${from.cards.length >= LINK_SIZE ? ' ✓' : ''}</span>` : ''}
+      <span class="pick-info"><span>+${pct(LINK_RAR[c.r] * (fav ? LINK_SCHOOL : 1))}</span>${kept === true ? `<span class="good" title="${L('Ek ortak türleri korur', 'Keeps the extra shared categories')}">✓ ${esc(shared.join(', '))}</span>` : kept === false ? `<span class="bad" title="${L('Ek ortak türü bozar', 'Breaks the extra shared category')}">✗ ${esc(shared.filter(x => !keep.includes(x)).join(', '))}</span>` : ''}</span></div>`;
+  };
+  const byVal = (a, b) => LINK_RAR[b.r] - LINK_RAR[a.r] || a.n.localeCompare(b.n);
+  const free = list.filter(c => !E.linkOfCard(c.a)).sort(byVal), linked = list.filter(c => E.linkOfCard(c.a)).sort(byVal);
+  openModal(`<div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">${esc(facName(l.f))} · ${esc(l.cat)} <small class="muted">${l.cards.length}/${LINK_SIZE}</small></h2>
+      <button class="btn ghost" data-act="close">${L('Kapat', 'Close')}</button></div>
+    <p class="muted">${L(`Kartın altında bağa katkısı yazar${fav ? ` (okul uyumu ×${LINK_SCHOOL} dahil)` : ''}; üzerine gelince bütün türleri görünür.`, `Below each card is what it adds to the link${fav ? ` (school affinity ×${LINK_SCHOOL} included)` : ''}; hover to see all its categories.`)}
+      ${shared && shared.length ? L(` Bu bağın şu anki ek ortak türleri: <b>${esc(shared.join(', '))}</b> (+${pct(shared.length * LINK_EXTRA)}). Yeşil kartlar bunu korur.`, ` This link's extra shared categories so far: <b>${esc(shared.join(', '))}</b> (+${pct(shared.length * LINK_EXTRA)}). Green cards keep them.`) : ''}</p>
+    ${free.length ? `<div class="picker-sec">${L('Boştaki kartlar', 'Free cards')} · ${free.length}</div><div class="pick-grid">${free.map(pick).join('')}</div>` : ''}
+    ${linked.length ? `<div class="picker-sec">⛓ ${L('Başka bağdaki kartlar', 'Cards in other links')} · ${linked.length} <small class="muted">${L('seçersen bulunduğu bağdan çıkar', 'picking one moves it out of its link')}</small></div><div class="pick-grid">${linked.map(pick).join('')}</div>` : ''}
+    ${list.length ? '' : `<p class="muted">${L('Bu bağa uyan kartın yok.', 'You have no cards that fit this link.')}</p>`}`, 'wide');
 }
 
 /* ---------- bestiary (bölgelere göre) ---------- */
@@ -691,39 +801,52 @@ function renderBestiary() {
 
 /* ---------- tüccar + demirci ---------- */
 function renderShop() {
-  const s = st();
-  const bonusTxt = w => {
-    const u = E.upLevel(w.id), per = w.type === 'silver' ? UPGRADE.silver : UPGRADE.steel;
-    const base = w.bonus + u * per, fmt = v => w.type === 'silver' ? L(`Hasar +%${v}`, `Damage +${v}%`) : L(`Kritik %${v}`, `Crit ${v}%`);
-    return `${fmt(base)}${w.school ? ` (${SCHOOLS[w.school]?.name}: ${fmt(base + (w.type === 'silver' ? 5 : 3))})` : ''}`;
+  const s = st(), lvNow = s.level;
+  const typeName = w => (w.type === 'silver' ? L('Gümüş', 'Silver') : L('Çelik', 'Steel'));
+  /* kılıcın gücü: sahip olunan kılıçta kendi seviyesinde, satılıkta senin seviyende */
+  const bonusTxt = (w, lv) => {
+    if (w.type === 'silver') {
+      const d = E.swordDmg(w, lv);
+      return `<span title="${L(`Saatlik vuruşa eklenir (seviye gücünün üstüne). Gücü kılıcın seviyesine ve kademesine bağlı${w.school ? '; kendi okulunun seti +%15' : ''}.`, `Added to every hourly hit (on top of your level power). Depends on the sword's level and rarity${w.school ? "; your own school's set +15%" : ''}.`)}">${L(`Hasar +${d}/sa`, `Damage +${d}/h`)}</span>`;
+    }
+    return `<span title="${L(`Her saatlik vuruşun kritik (×${CRIT_MULT}) olma şansı. Kılıcın seviyesine ve kademesine bağlı${w.school ? '; kendi okulunun seti +%3' : ''}.`, `Chance that an hourly hit is critical (×${CRIT_MULT}). Depends on the sword's level and rarity${w.school ? "; your own school's set +3%" : ''}.`)}">${L(`Kritik %${E.swordValue(w, lv)}`, `Crit ${E.swordValue(w, lv)}%`)}</span>`;
   };
-  const baneTxt = w => L(`${esc(CLASSES[w.bane]?.tr || w.bane)} avcısı: +%${BANE} hasar`, `${esc(CLASSES[w.bane]?.tr || w.bane)} bane: +${BANE}% damage`);
+  const curCls = s.contract ? monById(s.contract.id).cls : null;   // aktif kontratın türü vurgulanır
+  const baneTxt = w => { const list = (w.banes || [w.bane]).map(c => c === curCls ? `<b>${esc(CLASSES[c]?.tr || c)}</b>` : esc(CLASSES[c]?.tr || c)).join(' · ');
+    return `<span title="${L('Bu türlerdeki canavarlara ek hasar. Kalın olan, aktif kontratının türü.', 'Extra damage against monsters of these types. Bold is your active contract\'s type.')}">${L(`Avcı +%${w.banePct ?? BANE}: ${list}`, `Bane +${w.banePct ?? BANE}%: ${list}`)}</span>`; };
+  const uniqTxt = w => { const u = w.unique && DATA.UNIQUE_BY_ID[w.unique]; return u ? `<small class="unique ${w.tier === 6 ? 'aero' : ''}">✦ <b>${esc(u.name)}</b>: ${esc(u.desc)}</small>` : ''; };
+  const tag = w => (w.tier === 6 ? `<span class="rare-tag r2">${L('✦ Çok nadir', '✦ Very rare')}</span>` : w.tier === 4 ? `<span class="rare-tag r1">${L('✦ Efsanevi', '✦ Legendary')}</span>` : '');
+  const glow = w => (w.tier === 6 ? 'rare r2' : w.tier === 4 ? 'rare r1' : '');
   const swordCard = (w, mode) => {
-    const eq = s.swords[w.type] === w.id, lock = s.level < w.level;
-    return `<div class="sword t${w.tier} ${eq ? 'equipped' : ''}"><div class="sword-img">${swordImg(w)}</div>
-      <div class="sword-body"><b>${esc(w.name)}${E.upLevel(w.id) ? ` <span class="up">+${E.upLevel(w.id)}</span>` : ''}</b>
-        <small class="tier-name t${w.tier}">${SWORD_TIERS[w.tier].name} · ${w.type === 'silver' ? L('Gümüş', 'Silver') : L('Çelik', 'Steel')}${w.school ? ' · ' + SCHOOLS[w.school]?.name : ''}</small>
-        <small>${bonusTxt(w)}</small>
-        ${w.bane ? `<small class="bane">⚔ ${baneTxt(w)}</small>` : ''}
-        <div class="row" style="justify-content:space-between;margin-top:6px;flex-wrap:wrap;gap:4px">
-          ${mode === 'own' ? (() => {
-              const c = E.upgradeCost(w.id);
-              const up = c ? `<button class="btn sm" data-act="upgrade" data-id="${w.id}" ${s.gold < c.gold || s.scraps < c.scraps ? 'disabled' : ''} title="+${c.to}: ${w.type === 'silver' ? L(`+%${UPGRADE.silver} hasar`, `+${UPGRADE.silver}% damage`) : L(`+%${UPGRADE.steel} kritik`, `+${UPGRADE.steel}% crit`)}">⚒ +${c.to} · ${c.gold}🪙 ${c.scraps}✦</button>` : '<span class="badge gold">+5</span>';
-              const more = `${E.upLevel(w.id) ? `<button class="btn sm ghost" data-act="transfer" data-id="${w.id}" title="${L('Bu kılıcın güçlendirmesini başka bir kılıca aktar', "Transfer this sword's upgrade to another sword")}">↪ ${L('Aktar', 'Transfer')}</button>` : ''}
-                ${eq ? '' : `<button class="btn sm ghost" data-act="dismantle" data-id="${w.id}" title="${L(`Erit: ${E.dismantleValue(w.id).gold} oren, ${E.dismantleValue(w.id).scraps} kırıntı geri gelir`, `Dismantle: get back ${E.dismantleValue(w.id).gold} crowns, ${E.dismantleValue(w.id).scraps} scraps`)}">🔥 ${L('Erit', 'Dismantle')}</button>`}`;
-              return (eq ? `<span class="badge gold">${L('Kuşanıldı', 'Equipped')}</span>` : `<button class="btn sm" data-act="equip" data-id="${w.id}">${L('Kuşan', 'Equip')}</button>`) + up + more;
-            })()
-            : `<span class="price">${w.price} 🪙</span><button class="btn sm" data-act="buysword" data-id="${w.id}" ${lock || s.gold < w.price ? 'disabled' : ''}>${lock ? `${L('Sv', 'Lv')} ${w.level}` : L('Satın al', 'Buy')}</button>`}
-        </div></div></div>`;
+    const eq = s.swords[w.type] === w.id, lv = mode === 'own' ? E.swordLv(w.id) : lvNow;
+    let foot;
+    if (mode === 'own') {
+      const c = E.upgradeCost(w.id), dv = E.dismantleValue(w.id);
+      const next = c ? (w.type === 'silver' ? L(`hasar +${E.swordDmg(w, c.to)}/sa`, `damage +${E.swordDmg(w, c.to)}/h`) : L(`kritik %${E.swordValue(w, c.to)}`, `crit ${E.swordValue(w, c.to)}%`)) : '';
+      const up = c ? `<button class="btn sm" data-act="upgrade" data-id="${w.id}" ${s.gold < c.gold || s.scraps < c.scraps ? 'disabled' : ''} title="${L(`Seviye ${c.to}: ${next}`, `Level ${c.to}: ${next}`)}">⬆ ${L('Sv', 'Lv')} ${c.to} · ${c.gold}🪙 ${c.scraps}✦</button>`
+        : `<span class="badge" title="${L('Kılıcın seviyesi senin seviyeni geçemez. Seviye atlayınca yükseltebilirsin.', "A sword can't go above your level. Level up to upgrade it.")}">${L('Seviyende', 'At your level')}</span>`;
+      const more = eq ? '' : `<button class="btn sm ghost" data-act="dismantle" data-id="${w.id}" title="${L(`Erit: ${dv.gold} oren, ${dv.scraps} kırıntı geri gelir`, `Dismantle: get back ${dv.gold} crowns, ${dv.scraps} scraps`)}">🔥 ${L('Erit', 'Dismantle')}</button>`;
+      foot = (eq ? `<span class="badge gold">${L('Kuşanıldı', 'Equipped')}</span>` : `<button class="btn sm" data-act="equip" data-id="${w.id}">${L('Kuşan', 'Equip')}</button>`) + up + more;
+    } else {
+      const price = E.shopPrice(w);
+      foot = `<span class="price">${price} 🪙</span><button class="btn sm" data-act="buysword" data-id="${w.id}" ${s.gold < price ? 'disabled' : ''}>${L('Satın al', 'Buy')}</button>`;
+    }
+    return `<div class="sword t${w.tier} ${eq && mode === 'own' ? 'equipped' : ''} ${glow(w)}"><div class="sword-img">${swordImg(w)}</div>
+      <div class="sword-body">${tag(w)}<b>${esc(w.name)} <span class="up">${L('Sv', 'Lv')} ${lv}</span></b>
+        <small class="tier-name t${w.tier}">${SWORD_TIERS[w.tier].name} · ${typeName(w)}${w.school ? ' · ' + SCHOOLS[w.school]?.name : ''}</small>
+        <small>${bonusTxt(w, lv)}</small>
+        ${w.bane ? `<small class="bane">⚔ ${baneTxt(w)}</small>` : ''}${uniqTxt(w)}
+        <div class="row" style="justify-content:space-between;margin-top:6px;flex-wrap:wrap;gap:4px">${foot}</div></div></div>`;
   };
-  const owned = s.swords.owned.map(swordById).filter(Boolean).sort((a, b) => a.type.localeCompare(b.type) || b.tier - a.tier);
+  const owned = s.swords.owned.map(swordById).filter(Boolean).sort((a, b) => a.type.localeCompare(b.type) || E.swordValue(b) - E.swordValue(a));
   const diagrams = (s.diagrams || []).map(swordById).filter(Boolean);
-  const diagramCard = w => { const c = E.craftCost(w.id), lock = s.level < w.level;
-    return `<div class="sword t${w.tier}"><div class="sword-img">${swordImg(w)}</div><div class="sword-body"><b>📜 ${esc(w.name)}</b>
-      <small class="tier-name t${w.tier}">${L('Okul seti', 'School set')} · ${w.type === 'silver' ? L('Gümüş', 'Silver') : L('Çelik', 'Steel')} · ${SCHOOLS[w.school]?.name || w.school}</small>
-      <small>${bonusTxt(w)}</small>${w.bane ? `<small class="bane">⚔ ${baneTxt(w)}</small>` : ''}
+  const diagramCard = w => { const c = E.craftCost(w.id);
+    return `<div class="sword t${w.tier}"><div class="sword-img">${swordImg(w)}</div><div class="sword-body"><b>📜 ${esc(w.name)} <span class="up">${L('Sv', 'Lv')} ${lvNow}</span></b>
+      <small class="tier-name t${w.tier}">${L('Okul seti', 'School set')} · ${typeName(w)} · ${SCHOOLS[w.school]?.name || w.school}</small>
+      <small>${bonusTxt(w, lvNow)}</small>${w.bane ? `<small class="bane">⚔ ${baneTxt(w)}</small>` : ''}
       <div class="row" style="justify-content:space-between;margin-top:6px"><span class="price">${c.gold} 🪙 ${c.scraps} ✦</span>
-        <button class="btn sm" data-act="craftsword" data-id="${w.id}" ${lock || s.gold < c.gold || s.scraps < c.scraps ? 'disabled' : ''}>${lock ? `${L('Sv', 'Lv')} ${w.level}` : L('Yaptır', 'Craft')}</button></div></div></div>`; };
+        <button class="btn sm" data-act="craftsword" data-id="${w.id}" ${s.gold < c.gold || s.scraps < c.scraps ? 'disabled' : ''}>${L('Yaptır', 'Craft')}</button></div></div></div>`; };
+  const odds = rarityOdds(lvNow);
   const tomorrow = new Date(now()); tomorrow.setHours(24, 0, 0, 0);
   $('#shopPanel').innerHTML = `<h2>${L('Tüccar', 'Merchant')}</h2>
     <div class="shop-grid">${E.shopItems().map(i => `<div class="shop-item"><h3>${i.name}</h3><div class="muted">${i.desc}</div>
@@ -731,14 +854,15 @@ function renderShop() {
       <button class="btn" data-act="buy" data-id="${i.id}" ${i.disabled || s.gold < i.price ? 'disabled' : ''}>${L('Satın al', 'Buy')}</button></div></div>`).join('')}</div>
     <div class="row" style="justify-content:space-between;margin-top:26px"><h2 style="margin:0">${L('Demirci', 'Blacksmith')} <small class="muted">· ${L(`bugünün kılıçları, ${fmtDur(tomorrow - now())} sonra kendiliğinden yenilenir`, `today's swords, restocks by itself in ${fmtDur(tomorrow - now())}`)}</small></h2>
       <button class="btn" data-act="rerollshop" ${s.gold < E.shopRerollCost() ? 'disabled' : ''}>🔁 ${L('Stoğu yenile', 'Restock')} · ${E.shopRerollCost()} 🪙</button></div>
-    <p class="muted">${L(`Demirci her gün ${SHOP_DAILY} gümüş ve ${SHOP_DAILY} çelik kılıç getirir. <b>Gümüş</b> canavara verdiğin hasarı artırır, <b>çelik</b> kritik vuruş şansı verir (×${CRIT_MULT}). Her kılıç bir canavar sınıfının avcısıdır (o sınıfa +%${BANE} hasar). Stok seviyene göre gelir: 3 kılıç senin kademenden, 1 alt, 1 üst kademeden. Okul setleri satılmaz: Flotsam'dan itibaren bölge boss'ları şemalarını düşürür, demirciye yaptırırsın. Kendi okulunun seti ekstra bonus verir. Kılıçlarını oren ve kırıntıyla +${UPGRADE.max}'e kadar güçlendirebilirsin (her kademe gümüşe +%${UPGRADE.silver} hasar, çeliğe +%${UPGRADE.steel} kritik). Hasar bonusunda tavan yok ama azalan getiri var: ilk %60 tam, %60–120 arası %75'i, %120–180 arası %45'i, sonrası %20'si sayılır.`,
-      `Every day the blacksmith brings ${SHOP_DAILY} silver and ${SHOP_DAILY} steel swords. <b>Silver</b> raises the damage you deal to monsters, <b>steel</b> gives a critical hit chance (×${CRIT_MULT}). Every sword is the bane of one monster class (+${BANE}% damage against it). Stock follows your level: 3 swords from your tier, 1 from below, 1 from above. School sets aren't sold: from Flotsam on, region bosses drop their diagrams and the blacksmith crafts them. Your own school's set gives an extra bonus. Upgrade swords with crowns and scraps up to +${UPGRADE.max} (each step gives silver +${UPGRADE.silver}% damage, steel +${UPGRADE.steel}% crit). The damage bonus has no cap but diminishing returns: the first 60% counts fully, 60–120% at 75%, 120–180% at 45%, beyond that at 20%.`)}</p>
+    <p class="muted">${L(`Demirci her gün ${SHOP_DAILY} gümüş ve ${SHOP_DAILY} çelik kılıç getirir; hepsi <b>senin seviyende</b> (${lvNow}) gelir. <b>Gümüş</b> saatlik vuruşuna hasar ekler, <b>çelik</b> kritik vuruş şansı verir (×${CRIT_MULT}). Kılıcın gücü seviyesine ve kademesine bağlı; seviye şartı yok. Elindeki kılıcın seviyesini oren ve kırıntıyla yükseltebilirsin (en fazla kendi seviyene kadar). Kırıntı tekrar gelen kartlardan ve kazandığın her dövüşten (+${SCRAP_PER_KILL}) gelir. Her kılıç canavar türlerine karşı avcıdır: Sıradan 1, Usta işi 2, Büyülü 3 türe +%15; Efsanevi 4 türe +%25 (okul seti 4 türe +%20, Kadim 5 türe +%25). Okul setleri satılmaz: Lyria ve Vizima'dan itibaren bölge boss'ları şemalarını düşürür, demircide senin seviyende yaptırırsın; kendi okulunun seti ekstra bonus verir. Aerondight ${AERONDIGHT.minLevel}. seviyeden sonra çok nadiren çıkar.`,
+      `Every day the blacksmith brings ${SHOP_DAILY} silver and ${SHOP_DAILY} steel swords, all at <b>your level</b> (${lvNow}). <b>Silver</b> adds damage to your hourly hit, <b>steel</b> gives a critical hit chance (×${CRIT_MULT}). A sword's power depends on its level and rarity; there are no level requirements. Raise the level of a sword you own with crowns and scraps (up to your own level). Scraps come from duplicate cards and from every fight you win (+${SCRAP_PER_KILL}). Every sword is a bane to monster types: Common 1, Masterwork 2, Magic 3 types at +15%; Legendary 4 types at +25% (school set 4 at +20%, Ancient 5 at +25%). School sets aren't sold: from Lyria and Vizima on, region bosses drop their diagrams and the blacksmith crafts them at your level; your own school's set gives an extra bonus. Aerondight shows up very rarely after level ${AERONDIGHT.minLevel}.`)}</p>
+    <p class="odds" title="${L('Demircideki her kılıcın kademesi bu olasılıklarla belirlenir; seviyen arttıkça iyi kademeler artar.', "Each sword's rarity at the blacksmith is rolled with these odds; better rarities grow with your level.")}">🎲 ${L(`Seviye ${lvNow} olasılıkları`, `Odds at level ${lvNow}`)}: ${[1, 2, 3, 4].map(t => `<span class="tier-name t${t}">${SWORD_TIERS[t].name} ${L(`%${odds[t]}`, `${odds[t]}%`)}</span>`).join(' · ')}</p>
     <h3>${L('Gümüş', 'Silver')}</h3><div class="sword-grid">${E.dailySwords('silver').map(w => swordCard(w, 'buy')).join('') || `<p class="muted">${L('Satılık gümüş kılıç kalmadı.', 'No silver swords left for sale.')}</p>`}</div>
     <h3>${L('Çelik', 'Steel')}</h3><div class="sword-grid">${E.dailySwords('steel').map(w => swordCard(w, 'buy')).join('') || `<p class="muted">${L('Satılık çelik kılıç kalmadı.', 'No steel swords left for sale.')}</p>`}</div>
     ${diagrams.length ? `<h2 style="margin-top:26px">${L('Şemalar', 'Diagrams')} · ${diagrams.length}</h2><div class="sword-grid">${diagrams.map(diagramCard).join('')}</div>` : ''}
     <h2 style="margin-top:26px">${L('Kılıçların', 'Your swords')} · ${owned.length} / ${SWORDS.length}</h2>
-    <p class="muted">${L(`Kuşanmadığın kılıcı eritirsen fiyatının ve güçlendirme orenin %${DISMANTLE.gold * 100}'i, kırıntının %${DISMANTLE.scraps * 100}'si geri gelir. Güçlendirmeyi aynı türdeki başka kılıca hedef kılıcın fiyatının %${TRANSFER_FEE * 100}'i karşılığında aktarabilirsin.`,
-      `Dismantling an unequipped sword returns ${DISMANTLE.gold * 100}% of its price and upgrade crowns, and ${DISMANTLE.scraps * 100}% of the scraps. You can transfer upgrades to another sword of the same type for ${TRANSFER_FEE * 100}% of the target sword's price.`)}</p>
+    <p class="muted">${L(`Kılıcın seviyesini yükseltmenin bedeli, yeni seviyedeki fiyatının %${SWORD_UP.goldShare * 100}'i kadar oren ve biraz kırıntıdır. Kuşanmadığın kılıcı eritirsen fiyatının %${DISMANTLE.gold * 100}'i ve seviyesinin yarısı kadar kırıntı geri gelir.`,
+      `Raising a sword's level costs ${SWORD_UP.goldShare * 100}% of its price at the new level in crowns, plus some scraps. Dismantling an unequipped sword returns ${DISMANTLE.gold * 100}% of its price and scraps equal to half its level.`)}</p>
     ${owned.length ? `<div class="sword-grid">${owned.map(w => swordCard(w, 'own')).join('')}</div>` : `<p class="muted">${L('Henüz kılıcın yok.', 'You have no swords yet.')}</p>`}`;
 }
 
@@ -748,7 +872,7 @@ function charSummary(c, current) {
   const links = c.links.filter(l => l.cards.length >= LINK_SIZE).length;
   const legends = Object.keys(c.collection).filter(a => CARD_BY_ART[a]?.r === 'Legendary').length;
   return `<div class="char ${current ? 'current' : ''} ${c.legend ? 'legend' : ''}" ${current ? '' : `data-act="hallview" data-id="${c.id}"`}>
-    <div class="char-medal" style="background-image:url(${avatarSrc(c)})"></div>
+    <div class="char-medal" style="background-image:url(${avatarSrc(c)});${avatarTop(c) ? 'background-position:center top' : ''}"></div>
     <div class="char-body">
       <b>${esc(c.name)}</b> ${c.legend ? `<span class="badge gold">${L('Efsane', 'Legend')}</span>` : ''} ${current ? `<span class="badge">${L('Şu anki', 'Current')}</span>` : ''}
       <small class="muted">${SCHOOLS[c.school]?.name} · ${facName(c.faction)} · ${L('Seviye', 'Level')} ${c.level}${c.fame ? ` ★${c.fame}` : ''} · ${esc(bandLabel(c.region || 0))}</small>
@@ -892,7 +1016,7 @@ function renderHistory() {
       <td>${d.med ? hm(new Date(d.med)) + (d.medOnTime ? ' ✓' : '') : '—'}</td><td>${d.count != null ? d.count : d.check ? hm(new Date(d.check)) : '—'}</td>
       <td>${R[d.result]}${d.retro ? ` <span title="${L('Sonradan işlendi', 'Entered late')}">📝</span>` : ''}</td><td>${d.reward ? `+${d.reward.xp} ${L('TP', 'XP')}, +${d.reward.gold + (d.reward.payout || 0)} 🪙 (×${d.reward.mult})` : ''}</td></tr>`).join('')
       || `<tr><td colspan="6" class="muted">${L('Henüz tamamlanmış gün yok.', 'No completed days yet.')}</td></tr>`}</table>
-    <p class="hint">${L('Tüm geçmiş kaermorhen.db dosyasında (tablolar: habit_days, log). Her gün ilk açılışta backups/ klasörüne yedek alınır.', 'Your full history is in kaermorhen.db (tables: habit_days, log). A backup goes to the backups/ folder on the first start of each day.')}</p>`;
+    <p class="hint">${L('Tüm geçmiş hofw.db dosyasında (tablolar: habit_days, log). Her gün ilk açılışta backups/ klasörüne yedek alınır.', 'Your full history is in hofw.db (tables: habit_days, log). A backup goes to the backups/ folder on the first start of each day.')}</p>`;
 }
 
 /* ---------- ayarlar ---------- */
@@ -912,11 +1036,18 @@ function renderSettings() {
       <h3>📱 ${L('Telefondan erişim', 'Phone access')}</h3><div id="accessBox"><small class="muted">${L('Yükleniyor…', 'Loading…')}</small></div>
       <h3>${L('Okul', 'School')}</h3><p class="muted">${L(`Şu an: ${SCHOOLS[st().school].name}. Okul değiştirmek 150 oren.`, `Current: ${SCHOOLS[st().school].name}. Changing school costs 150 crowns.`)}</p>
       <button class="btn" data-act="changeschool">${L('Okul değiştir', 'Change school')}</button>
+      <h3>${L('Kart odağı', 'Card focus')}</h3>${(() => { const f = st().faction, p = E.factionProgress();
+        if (!f) return `<p class="muted">${L('Bütün fraksiyonlardan kart topluyorsun.', 'You collect cards from every faction.')}</p>`;
+        const done = p.have >= p.total, others = FACTIONS.filter(x => x !== f);
+        return `<p class="muted">${L(`Şu an: <b>${facName(f)}</b> + tarafsız · ${p.have}/${p.total} ${facName(f)} kartı. Bu fraksiyonun bütün kartlarını toplayınca başka bir fraksiyona geçebilirsin; topladıkların koleksiyonunda kalır.`, `Current: <b>${facName(f)}</b> + neutral · ${p.have}/${p.total} ${facName(f)} cards. Once you collect every card of this faction you can switch to another; your cards stay in your collection.`)}${(st().factionsDone || []).length ? L(` Tamamlananlar: ${st().factionsDone.map(facName).join(', ')}.`, ` Completed: ${st().factionsDone.map(facName).join(', ')}.`) : ''}</p>
+          <div class="bar qbar thin"><div class="fill" style="width:${p.have / p.total * 100}%"></div><span>${p.have} / ${p.total}</span></div>
+          <div class="row" style="margin-top:6px"><select id="newFaction" ${done ? '' : 'disabled'}>${others.map(x => `<option value="${x}" ${(st().factionsDone || []).includes(x) ? '' : ''}>${facName(x)}${(st().factionsDone || []).includes(x) ? ' ✓' : ''}</option>`).join('')}<option value="all">${L('Bütün fraksiyonlar', 'All factions')}</option></select>
+            <button class="btn" data-act="changefaction" ${done ? '' : 'disabled'} title="${done ? '' : L('Önce bu fraksiyonun bütün kartlarını topla', 'Collect every card of this faction first')}">${L('Odağı değiştir', 'Change focus')}</button></div>`; })()}
     </div><div>
       <h3>${L('Yedek', 'Backup')}</h3>
       <div class="row"><button class="btn" data-act="export">${L('Dışa aktar (JSON)', 'Export (JSON)')}</button>
         <label class="btn" style="margin:0;color:var(--gold2)">${L('İçe aktar', 'Import')}<input type="file" id="importFile" accept=".json" hidden></label></div>
-      <p class="hint">${L('Asıl kayıt kaermorhen.db. Günlük otomatik yedekler backups/ klasöründe.', 'The main save is kaermorhen.db. Daily automatic backups are in the backups/ folder.')}</p>
+      <p class="hint">${L('Asıl kayıt hofw.db. Günlük otomatik yedekler backups/ klasöründe.', 'The main save is hofw.db. Daily automatic backups are in the backups/ folder.')}</p>
       <h3>${L('Kurallar', 'Rules')}</h3><button class="btn" data-act="rules">${L('Nasıl oynanır?', 'How to play')}</button>
       <h3>Test</h3><p class="muted">${L('Test.bat ayrı bir test kaydıyla açar: zamanı ileri sarabilir, her şeyi gerçek kaydına dokunmadan deneyebilirsin.', 'Test.bat (or server.py --open "?slot=test") opens a separate test save: you can move time forward and try anything without touching your real save.')}</p>
       <a class="btn" href="/tests.html" target="_blank">${L('Otomatik testleri çalıştır', 'Run automated tests')}</a>
@@ -1020,7 +1151,10 @@ function flipInfo() {
 /* ---------- açılış ---------- */
 let pickSchool = 'wolf', pickFaction = 'Scoiatael';
 const schoolGrid = () => `<div class="schools">${Object.entries(SCHOOLS).map(([id, s]) => `<div class="school ${id === pickSchool ? 'sel' : ''}" data-act="pickschool" data-id="${id}">
-  <div class="simg">${imgTag(ART(s.art, 'low'))}</div><div class="sbody"><b>${s.name}</b>${s.desc}</div></div>`).join('')}</div>`;
+  <div class="simg">${imgTag(DATA.schoolImg(id, 'low'), s.img ? 'top' : '')}</div><div class="sbody"><b>${s.name}</b>${s.desc}<small class="muted" style="display:block;margin-top:4px">${kitText(id)}</small></div></div>`).join('')}</div>`;
+const kitText = id => { const k = START_KIT[id], sw = [k.silver, k.steel].map(swordById).filter(Boolean).map(w => w.name).join(', ');
+  return L(`Başlangıç: ${k.gold} oren · ${k.swallow} Swallow · ${k.honey} White Honey${k.thunder ? ` · ${k.thunder} Thunderbolt` : ''}${k.dancing ? ` · ${k.dancing} Dancing Star` : ''}${k.scraps ? ` · ${k.scraps} kırıntı` : ''}${sw ? ` · ${sw}` : ''}`,
+    `Start: ${k.gold} crowns · ${k.swallow} Swallow · ${k.honey} White Honey${k.thunder ? ` · ${k.thunder} Thunderbolt` : ''}${k.dancing ? ` · ${k.dancing} Dancing Star` : ''}${k.scraps ? ` · ${k.scraps} scraps` : ''}${sw ? ` · ${sw}` : ''}`); };
 const FACTION_ART = { Monster: 1652, Nilfgaard: 1285, 'Northern Realms': 2357, Scoiatael: 1189, Skellige: 2347, Syndicate: 1843 };
 const factionGrid = () => `<div class="schools">${FACTIONS.map(f => `<div class="school ${f === pickFaction ? 'sel' : ''}" data-act="pickfaction" data-id="${f}">
   <div class="simg">${imgTag(ART(FACTION_ART[f], 'low'))}</div><div class="sbody"><b>${facName(f)}</b>${L(`${CARDS.filter(c => c.f === f).length} kart + ${CARDS.filter(c => c.f === 'Neutral').length} tarafsız`, `${CARDS.filter(c => c.f === f).length} cards + ${CARDS.filter(c => c.f === 'Neutral').length} Neutral`)}</div></div>`).join('')}
@@ -1043,16 +1177,16 @@ function showRules() {
   <h3>Ana görev</h3>
   <p>Edinmek istediğin tek bir alışkanlık. <b>Uyku düzeni</b>nde bir yatış, bir de kalkış aralığı vardır; <b>günlük alışkanlık</b>ta tek bir aralık. Aralığın içinde ne zaman yaptığın fark etmez. ${QUEST_MIN}–${QUEST_MAX} günlük bir hedef seçersin; o kadar başarılı gün biriktirince alışkanlık edinilir.</p>
   <h3>Her gün</h3>
-  <p><b>Yatış (uyku):</b> aralıkta meditasyon küçük ödül verir, canavara ${DMG.prep} hasar vurur, sabahı ×1.5 ve +1 kart yapar. <b>Kalkış / görev:</b> aralıkta yaparsan başarı: kart, TP, oren, canavara ${DMG.wake}–${DMG.daily} hasar. Aralık sonrası tolerans içinde yaparsan gecikme, hiç yapmazsan kaçırma.</p>
+  <p><b>Yatış (uyku):</b> aralıkta meditasyon küçük ödül verir, sabahı ×1.5 ve +1 kart yapar. <b>Kalkış / görev:</b> aralıkta yaparsan başarı: kart, TP, oren ve zincirine bir halka. Aralık sonrası tolerans içinde yaparsan gecikme, hiç yapmazsan kaçırma.</p>
   <h3>Kontratlar ve bölgeler</h3>
   <p>Açık her bölgenin ilan panosuna her pazartesi ${BOARD_SIZE} canavar asılır. Haritadan istediğin bölgeden birini seçersin, başarılı günlerin ona hasar verir. Her canavarın canı ve ödülü farklıdır: canı az olanın ödülü de azdır. Ölünce oren, TP ve kart alırsın. Aynı canavar bu karakterle bir daha gelmez (efsane olduktan sonra elit olarak döner). Asıl TP canavarlardan gelir.</p>
   <p>Kademeler: ${Array.from({ length: BAND_COUNT }, (_, b) => `${bandLabel(b)} (${b * 4 + 1}–${b * 4 + 4})`).join(' → ')}. Aynı kademedeki bölgeler birlikte açılır. Kademenin üst seviyesine gelince TP birikmeye devam eder (en fazla bir seviyelik), ama ilerlemek için kademenin boss'larından birini yenmen gerekir; diğer boss sonra da kesilebilir. Son boss'u yenen karakter efsane olur; istersen onunla devam edersin: canavarlar ve boss'lar elit olarak geri gelir, 32'den sonraki TP Ün (★) verir.</p>
   <h3>Hasar</h3>
-  <p>Gümüş kılıç (ve güçlendirmesi), zincir malzemesi ve kart bağları hasarını artırır; çelik kılıç kritik vuruş şansı verir. Bonuslar azalan getiriyle toplanır: ilk %60 tam, %60–120 arası %75'i, %120–180 arası %45'i, sonrası %20'si sayılır. Kılıçlar oren ve kırıntıyla +${UPGRADE.max}'e kadar güçlendirilir.</p>
+  <p>Saat başı bir vuruş yaparsın: (seviye gücü + gümüş kılıç) × (1 + bonus). Gümüş kılıç hasar ekler, çelik kılıç kritik şansı verir (×1.5); güçleri kılıcın seviyesine ve kademesine bağlı. Zincir ana güç kaynağıdır: Çelik +%10, Gümüş +%20, Altın +%30, Mithril +%50, Göktaşı +%100. ${MULTI_CHAIN_TXT()} Zincir, kart bağı ve avcı bonusları düz toplanır; tavan yok. Kılıçlar demircide senin seviyende çıkar; seviyesini oren ve kırıntıyla kendi seviyene kadar yükseltebilirsin.</p>
   <h3>Av (idle)</h3>
-  <p>Karakterin kontrattaki canavarla sürekli dövüşür; uygulama kapalıyken de. Saatlik hasarın seviyenden, kılıçlarından, zincirlerinden ve kart bağlarından gelir. Canavar sana kendiliğinden vurmaz: bir görevi geciktirirsen yarım, kaçırırsan tam vurur (boss'lar daha sert). Can kendiliğinden dolmaz; savaş panelinden Swallow içersin. Can sıfırlanırsa yenilirsin: canavarın canı tamamen dolar, 6 saat toparlanır ve tam canla dönersin. Bir alışkanlığı başarınca canavara 1 saatlik ek hasar vurulur. Kartlar avdan değil alışkanlıklardan gelir.</p>
+  <p>Karakterin kontrattaki canavarla sürekli dövüşür; uygulama kapalıyken de. Saatlik hasarın seviyenden, kılıçlarından, zincirlerinden ve kart bağlarından gelir. Canavar sana kendiliğinden vurmaz: bir görevi geciktirirsen yarım, kaçırırsan tam vurur (boss'lar daha sert). Can avdayken saatte yaklaşık %0,3 dolar (okula göre: Bear %0,5, Griffin %0,35, Wolf %0,3, Viper %0,25, Cat %0,2, Manticore %0,3); yenilip toparlanırken saatte %15 (Bear okulu %30). Kontrat hiç bitmez: istersen panodan başka bir kontrat seçersin (eskisinin ilerlemesi sıfırlanır), seçmezsen en kolay iş kendiliğinden alınır. Acil durumda Swallow içersin; Thunderbolt 12 saat hasarı +%20 artırır, Tawny Owl alınınca +10 TP verir, Dancing Star bombası canının %50'si karşılığında canavara rastgele 3–10 saatlik hasarın kadar vurur. Canın %50'nin altındayken Yaralısın: hasarın −%20. Can sıfırlanırsa yenilirsin: canavarın canı tamamen dolar, orenin %10'unu kaybedersin ve canın dolana kadar toparlanırsın. Kartlar avdan değil alışkanlıklardan gelir.</p>
   <h3>Cezalar</h3>
-  <p>Gecikmek canavarın yarım vuruşu ve 12 saat "Yorgun" (hasar −%15), kaçırmak tam vuruş ve 24 saat "Bitkin" (−%30) demektir; cezalar birikir ama en çok −%60 olur. White Honey kaçırılan bir günde kendiliğinden içilir: canavar vuramaz, Bitkin olmazsın.</p>
+  <p>Gecikmek canavarın yarım vuruşu ve 12 saat "Yorgun" (hasar −%15), kaçırmak tam vuruş ve 24 saat "Bitkin" (−%30) demektir; cezalar birikir ama en çok −%60 olur. White Honey kaçırılan bir günde kendiliğinden içilir: canavar vuramaz, Bitkin olmazsın. Griffin okulu ne Yorgun ne Bitkin olur.</p>
   <h3>Zincir</h3>
   <ul>
    <li>Her başarılı gün bir halka: <b>Demir → Çelik (7) → Gümüş (14) → Altın (30) → Göktaşı (60)</b>.</li>
@@ -1068,16 +1202,16 @@ function showRulesEn() {
   <h3>Main quest</h3>
   <p>One habit you want to build. A <b>sleep schedule</b> has a bedtime window and a wake-up window; a <b>daily habit</b> has a single window. When inside the window you do it doesn't matter. You pick a goal of ${QUEST_MIN}–${QUEST_MAX} days; collect that many successful days and the habit is formed.</p>
   <h3>Every day</h3>
-  <p><b>Bedtime (sleep):</b> meditating in the window gives a small reward, deals ${DMG.prep} damage to your monster, and makes the morning ×1.5 with +1 card. <b>Wake-up / quest:</b> doing it in the window is a success: cards, XP, crowns and ${DMG.wake}–${DMG.daily} damage. Doing it after the window, within the tolerance, is late; not doing it at all is missed.</p>
+  <p><b>Bedtime (sleep):</b> meditating in the window gives a small reward and makes the morning ×1.5 with +1 card. <b>Wake-up / quest:</b> doing it in the window is a success: cards, XP, crowns and a new chain link. Doing it after the window, within the tolerance, is late; not doing it at all is missed.</p>
   <h3>Contracts and regions</h3>
   <p>Every Monday each unlocked region's notice board gets ${BOARD_SIZE} monsters. Pick one from any region on the map, and your successful days damage it. Each monster has its own HP and reward: weaker monsters pay less. When it dies you get crowns, XP and cards. A monster doesn't return for the same character (after you become a legend, it returns as an elite). Most XP comes from monsters.</p>
   <p>Tiers: ${Array.from({ length: BAND_COUNT }, (_, b) => `${bandLabel(b)} (${b * 4 + 1}–${b * 4 + 4})`).join(' → ')}. Regions of the same tier unlock together. At a tier's top level your XP keeps building (up to one level), but to advance you must defeat one of the tier's bosses; the other can still be fought later. The character who beats the final boss becomes a legend and can keep playing: monsters and bosses return as elites, and XP past level 32 grants Renown (★).</p>
   <h3>Damage</h3>
-  <p>Your silver sword (and its upgrades), chain material and card links raise your damage; a steel sword gives a critical hit chance. Bonuses stack with diminishing returns: the first 60% counts fully, 60–120% at 75%, 120–180% at 45%, beyond that at 20%. Swords can be upgraded up to +${UPGRADE.max} with crowns and scraps.</p>
+  <p>You strike once an hour: (level power + silver sword) × (1 + bonus). A silver sword adds damage, a steel sword a crit chance (×1.5); their power depends on the sword's level and rarity. Chains are your main power source: Steel +10%, Silver +20%, Gold +30%, Mithril +50%, Meteorite +100%. ${MULTI_CHAIN_TXT()} Chain, card link and bane bonuses simply add up; there is no cap. Swords come at your level; raise their level with crowns and scraps up to your own.</p>
   <h3>The hunt (idle)</h3>
-  <p>Your character fights the contract's monster continuously, even while the app is closed. Your damage per hour comes from your level, swords, chains and card links. Monsters don't hit you on their own: being late on a quest earns you half a hit, missing it a full hit (bosses hit harder). HP doesn't refill by itself; drink a Swallow from the combat panel. If your HP hits zero you are defeated: the monster heals completely, and you recover for 6 hours and return at full HP. Completing a habit deals an extra hour of damage. Cards come from habits, not from the hunt.</p>
+  <p>Your character fights the contract's monster continuously, even while the app is closed. Your damage per hour comes from your level, swords, chains and card links. Monsters don't hit you on their own: being late on a quest earns you half a hit, missing it a full hit (bosses hit harder). HP regenerates about 0.3% per hour while hunting (by school: Bear 0.5%, Griffin 0.35%, Wolf 0.3%, Viper 0.25%, Cat 0.2%, Manticore 0.3%); while recovering from a defeat, 15% per hour (Bear School 30%). The contract never ends: pick another one from a board if you like (the old one's progress resets), otherwise the easiest job is taken automatically. In an emergency, drink a Swallow; Thunderbolt raises damage by 20% for 12 hours, Tawny Owl gives +10 XP on purchase, and the Dancing Star bomb hits the monster for a random 3–10 hours of your damage at the cost of 50% of your HP. Below 50% HP you are Wounded: −20% damage. If your HP hits zero you are defeated: the monster heals completely, you lose 10% of your crowns and recover until your HP is full. Cards come from habits, not from the hunt.</p>
   <h3>Penalties</h3>
-  <p>Being late means half a monster hit and 12 hours "Tired" (−15% damage); missing means a full hit and 24 hours "Exhausted" (−30%); penalties stack up to −60%. White Honey is drunk automatically on a missed day: the monster can't strike and you don't become Exhausted.</p>
+  <p>Being late means half a monster hit and 12 hours "Tired" (−15% damage); missing means a full hit and 24 hours "Exhausted" (−30%); penalties stack up to −60%. White Honey is drunk automatically on a missed day: the monster can't strike and you don't become Exhausted. The Griffin School never becomes Tired or Exhausted.</p>
   <h3>Chain</h3>
   <ul>
    <li>Each successful day adds a link: <b>Iron → Steel (7) → Silver (14) → Gold (30) → Meteorite (60)</b>.</li>
@@ -1091,7 +1225,7 @@ function showRulesEn() {
 function showFileMode() {
   const old = localStorage.getItem('kaermorhen_main');
   openModal(`<h2>${L('Habits of Witchers sunucuyla çalışıyor', 'Habits of Witchers runs with a server')}</h2>
-    <p>${L('Uygulamayı klasördeki <b>Baslat.bat</b> ile aç. Kayıtlar <b>kaermorhen.db</b> dosyasında.', 'Start the app with <b>Baslat.bat</b> (or <code>python3 server.py</code>) in its folder. Your data lives in <b>kaermorhen.db</b>.')}</p>
+    <p>${L('Uygulamayı klasördeki <b>Baslat.bat</b> ile aç. Kayıtlar <b>hofw.db</b> dosyasında.', 'Start the app with <b>Baslat.bat</b> (or <code>python3 server.py</code>) in its folder. Your data lives in <b>hofw.db</b>.')}</p>
     ${old ? `<p>${L('Bu tarayıcıda eski bir kaydın var. Baslat.bat çalışırken butona basarsan veritabanına taşınır.', 'This browser has an old save. Press the button while the server is running to move it into the database.')}</p><button class="btn big" data-act="migratefile">${L('Eski kaydımı taşı', 'Move my old save')}</button>` : ''}
     <p class="hint">${L('Sunucu açıksa', 'If the server is running')}: <a href="http://localhost:8642/">http://localhost:8642</a></p>`);
 }
@@ -1171,9 +1305,12 @@ document.addEventListener('click', async e => {
     case 'prep': act(E.prep(t.dataset.h)); break;
     case 'check': act(E.checkIn(t.dataset.h)); break;
     case 'addcount': act(E.addCount(+t.dataset.n, t.dataset.h)); break;
+    case 'subtoggle': act(E.toggleItem(t.dataset.item, t.dataset.h)); break;
     case 'addcountin': { const v = +$('#cnt-' + t.dataset.h)?.value; if (!v) return toast(L('Bir sayı gir.', 'Enter a number.'), 'bad'); act(E.addCount(v, t.dataset.h)); break; }
     case 'tab': switchTab(t.dataset.tab); break;
     case 'drink': act(E.drinkPotion()); break;
+    case 'thunder': act(E.drinkThunder()); break;
+    case 'dancing': act(E.throwDancing()); break;
     case 'queue': if (act(E.queueAdd(id)) && $('#modalBox .cboard')) showBoard(boardSel.r); break;
     case 'unqueue': act(E.queueRemove(id)); break;
     case 'habitdel': {
@@ -1238,27 +1375,17 @@ document.addEventListener('click', async e => {
     case 'avatar': st().avatar = +t.dataset.a; closeModal(); commit(); toast(L('Madalyon güncellendi.', 'Medallion updated.')); break;
     case 'craft': closeModal(); act(E.craft(+t.dataset.a)); break;
     case 'buy': act(E.buy(id)); break;
-    case 'buysword': { const w = swordById(id); if (w && confirm(L(`${w.name} için ${w.price} oren harcansın mı?`, `Spend ${w.price} crowns on ${w.name}?`))) act(E.buySword(id)); break; }
+    case 'buysword': { const w = swordById(id), p = w && E.shopPrice(w); if (w && confirm(L(`${w.name} (seviye ${st().level}) için ${p} oren harcansın mı?`, `Spend ${p} crowns on ${w.name} (level ${st().level})?`))) act(E.buySword(id)); break; }
     case 'equip': act(E.equipSword(id)); break;
     case 'equipbest': act(E.equipBest()); break;
     case 'craftsword': { const w = swordById(id), c = E.craftCost(id); if (w && confirm(L(`${w.name} yaptırılsın mı? ${c.gold} oren ve ${c.scraps} kırıntı.`, `Craft ${w.name}? ${c.gold} crowns and ${c.scraps} scraps.`))) act(E.craftSword(id)); break; }
     case 'dismantle': { const w = swordById(id), v = E.dismantleValue(id); if (w && confirm(L(`${w.name} eritilsin mi? ${v.gold} oren ve ${v.scraps} kırıntı geri gelir. Geri alınamaz.`, `Dismantle ${w.name}? You get back ${v.gold} crowns and ${v.scraps} scraps. This can't be undone.`))) act(E.dismantleSword(id)); break; }
-    case 'transfer': {
-      const w = swordById(id), targets = st().swords.owned.map(swordById).filter(x => x && x.id !== id && x.type === w.type && E.upLevel(x.id) < E.upLevel(id));
-      if (!targets.length) return toast(L('Aktarılacak, daha az güçlendirilmiş aynı türde bir kılıcın yok.', 'You have no less-upgraded sword of the same type to transfer to.'), 'bad');
-      openModal(`<h2>↪ ${L(`${esc(w.name)} +${E.upLevel(id)} güçlendirmesini aktar`, `Transfer the +${E.upLevel(id)} upgrade of ${esc(w.name)}`)}</h2><p class="muted">${L(`Hedef kılıç +${E.upLevel(id)} olur, ${esc(w.name)} +0'a döner.`, `The target sword becomes +${E.upLevel(id)}, and ${esc(w.name)} goes back to +0.`)}</p>
-        <div class="sword-grid">${targets.map(x => `<div class="sword t${x.tier}"><div class="sword-img">${swordImg(x)}</div><div class="sword-body"><b>${esc(x.name)}${E.upLevel(x.id) ? ' +' + E.upLevel(x.id) : ''}</b>
-          <small>${SWORD_TIERS[x.tier].name} · ${L(`${esc(CLASSES[x.bane]?.tr || '')} avcısı`, `${esc(CLASSES[x.bane]?.tr || '')} bane`)}</small>
-          <div class="row" style="justify-content:space-between;margin-top:6px"><span class="price">${E.transferFee(x.id)} 🪙</span>
-          <button class="btn sm" data-act="transfergo" data-from="${id}" data-id="${x.id}" ${st().gold < E.transferFee(x.id) ? 'disabled' : ''}>${L('Aktar', 'Transfer')}</button></div></div></div>`).join('')}</div>
-        <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn ghost" data-act="close">${L('Vazgeç', 'Cancel')}</button></div>`);
-      break;
-    }
-    case 'transfergo': closeModal(); act(E.transferUpgrades(t.dataset.from, id)); break;
     case 'upgrade': { const w = swordById(id), c = E.upgradeCost(id); if (w && c && confirm(L(`${w.name} +${c.to} olsun mu? ${c.gold} oren ve ${c.scraps} kırıntı harcanacak.`, `Upgrade ${w.name} to +${c.to}? This costs ${c.gold} crowns and ${c.scraps} scraps.`))) act(E.upgradeSword(id)); break; }
     case 'newlink': { const r = E.createLink($('#linkFac').value, $('#linkCat').value); if (act(r)) showLinkPicker(r.link.id); break; }
     case 'linkpick': showLinkPicker(t.dataset.link); break;
-    case 'linkadd': { if (act(E.addToLink(t.dataset.link, +t.dataset.a))) { const l = st().links.find(x => x.id === t.dataset.link); closeModal(); if (l && l.cards.length < LINK_SIZE) showLinkPicker(l.id); } break; }
+    case 'linkadd': { const from = E.linkOfCard(+t.dataset.a);
+      if (from && from.cards.length >= LINK_SIZE && !confirm(L(`Bu kart tamamlanmış "${from.cat}" bağında. Taşırsan o bağ eksik kalır. Taşınsın mı?`, `This card is in the complete "${from.cat}" link. Moving it leaves that link incomplete. Move it?`))) break;
+      if (act(E.addToLink(t.dataset.link, +t.dataset.a))) { const l = st().links.find(x => x.id === t.dataset.link); closeModal(); if (l && l.cards.length < LINK_SIZE) showLinkPicker(l.id); } break; }
     case 'unlink': if (confirm(L('Bu kart bağdan çıkarılsın mı?', 'Remove this card from the link?'))) act(E.removeFromLink(t.dataset.link, +t.dataset.a)); break;
     case 'dellink': if (confirm(L('Bu bağ silinsin mi? Kartlar koleksiyonunda kalır.', 'Delete this link? The cards stay in your collection.'))) act(E.deleteLink(t.dataset.link)); break;
     case 'questsave': if (act(E.updateQuest(readQuestForm(t.closest('.habit-edit')), t.dataset.h))) toast(L('Alışkanlık güncellendi.', 'Habit updated.'), 'good'); break;
@@ -1295,6 +1422,7 @@ document.addEventListener('click', async e => {
       pickSchool = st().school;
       openModal(`<h2>${L('Okul değiştir', 'Change school')} (150 🪙)</h2>${schoolGrid()}<div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="close">${L('Vazgeç', 'Cancel')}</button><button class="btn" data-act="confirmschool">${L('Değiştir', 'Change')}</button></div>`);
       break;
+    case 'changefaction': { const f = $('#newFaction')?.value; if (f && confirm(L('Kart odağı değişsin mi?', 'Change card focus?'))) act(E.changeFaction(f)); break; }
     case 'confirmschool': closeModal(); if (pickSchool !== st().school) act(E.changeSchool(pickSchool)); break;
     case 'pickschool': pickSchool = id; t.parentElement.querySelectorAll('.school').forEach(el => el.classList.toggle('sel', el.dataset.id === id)); break;
     case 'pickfaction': pickFaction = id; t.parentElement.querySelectorAll('.school').forEach(el => el.classList.toggle('sel', el.dataset.id === id)); break;
@@ -1308,7 +1436,7 @@ document.addEventListener('click', async e => {
     }
     case 'export': {
       const blob = new Blob([JSON.stringify(st(), null, 1)], { type: 'application/json' });
-      const el = document.createElement('a'); el.href = URL.createObjectURL(blob); el.download = `${L('kaermorhen-yedek', 'habits-of-witchers-backup')}-${dk(now())}.json`; el.click(); break;
+      const el = document.createElement('a'); el.href = URL.createObjectURL(blob); el.download = `${L('hofw-yedek', 'hofw-backup')}-${dk(now())}.json`; el.click(); break;
     }
     case 'rules': showRules(); break;
     case 'reset': { const word = L('SIFIRLA', 'RESET'); if (confirm(L('Tüm ilerleme silinecek. Emin misin?', 'All progress will be deleted. Are you sure?')) && prompt(L(`Onay için ${word} yaz`, `Type ${word} to confirm`)) === word) { E = null; currentTab = 'home'; showOnboarding(); } break; }

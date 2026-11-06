@@ -31,10 +31,14 @@ Gereken tek şey **Python 3.9+** (ek paket yok).
    py -3 tools/fetch_cards.py        (macOS/Linux: python3 tools/fetch_cards.py)
    ```
 4. Tarayıcı `http://localhost:8642` adresinde açılır. Sunucu penceresi açık kaldığı sürece uygulama çalışır.
+5. (İsteğe bağlı) Görseller ilk gösterildiklerinde bir kez indirilip `hofw-gorsel.db`'ye kaydedilir; sonra internetsiz de görünür. Hepsini önceden indirmek için:
+   ```
+   py -3 tools/cache_images.py       (kartların orta boy görselleri de: --all)
+   ```
 
 - **Test modu:** `Test.bat` (ya da `python3 server.py --open "?slot=test"`) ayrı bir test kaydı açar; zamanı ileri sarıp her şeyi gerçek kaydına dokunmadan deneyebilirsin.
 - **Otomatik testler:** `http://localhost:8642/tests.html`
-- **Veriler:** `kaermorhen.db`; günlük yedekler `backups/` klasöründe. Bu dosyalar `.gitignore` ile depodan hariç tutulur.
+- **Veriler:** `hofw.db`; günlük yedekler `backups/` klasöründe. Bu dosyalar `.gitignore` ile depodan hariç tutulur.
 
 ## Dosyalar
 
@@ -45,6 +49,7 @@ Gereken tek şey **Python 3.9+** (ek paket yok).
 | `app.js`, `index.html`, `style.css` | Arayüz |
 | `monsters.js`, `swords.js` | Bölgeler, canavarlar, kılıçlar (denge değerleri) |
 | `tools/fetch_cards.py` | Kart verisini indirip `cards.js` üretir |
+| `imgcache.py`, `tools/cache_images.py` | Görsel önbelleği (`hofw-gorsel.db`) ve toplu indirme |
 | `tests.js`, `tests.html` | Tarayıcıda çalışan testler ve denge simülasyonu |
 
 ---
@@ -67,7 +72,7 @@ Requires **Python 3.9+** only (no packages).
 python3 server.py            # Windows: double-click Baslat.bat
 ```
 
-On first start the server downloads card data from gwent.one into `cards.js`. If that fails, run `python3 tools/fetch_cards.py`. Then open `http://localhost:8642`. Your data stays in `kaermorhen.db` on your machine.
+On first start the server downloads card data from gwent.one into `cards.js`. If that fails, run `python3 tools/fetch_cards.py`. Then open `http://localhost:8642`. Your data stays in `hofw.db` on your machine.
 
 ### Credits
 

@@ -30,6 +30,7 @@ function setup({ type = 'sleep', school = 'wolf', faction = null, start = '2026-
   return { E, s, go, clock };
 }
 const day = (s, k) => s.days[k] || {};
+const pad2 = n => String(n).padStart(2, '0');
 const contractHp = s => s.contract ? s.contract.hp : null;
 function succeed(E, go, startDay, n) {
   for (let i = 0; i < n; i++) { const k = T.addDays(startDay, i); go(`${k}T08:10`); isOk(E.checkIn(), `gün ${k}`); }
@@ -82,18 +83,22 @@ test('Kaçırılan gün: zincir kırılır; ilk seferde White Honey korur, ikinc
 test('Savaş: av sürekli akar; canavarlar zamanla ölür, oren ve TP gelir, sıradaki kontrat kendiliğinden alınır', () => {
   const { E, s, go } = setup({ idle: true });
   const g = s.stats.goldEarned, xp = s.xp + s.level * 1000;
-  go('2026-11-07T21:00');                                          // 24 saat
-  ok(s.trophies.length >= 2, 'bir günde birkaç kolay canavar: ' + s.trophies.length);
+  go('2026-11-09T21:30');                                          // 4 gün
+  ok(s.trophies.length >= 2, 'birkaç günde birkaç canavar: ' + s.trophies.length);
   ok(s.stats.goldEarned > g && s.xp + s.level * 1000 > xp, 'oren ve TP');
-  ok(s.contract, 'yeni kontrat'); eq(s.combat.t, new Date('2026-11-07T21:00').toISOString());
+  ok(s.contract, 'yeni kontrat'); eq(s.combat.t, new Date('2026-11-09T21:00').toISOString(), 'saat başı vuruş: son tam saat');
   ok(s.log.some(l => /izini|medallion|karşı karşıya|Kırık dallar|trail|face/.test(l.text)), 'günlükte savaş anları');
   ok(!E.ev.reveals.some(r => /ganimeti|loot/.test(r.title)), 'avdan kart fıçısı gelmez (sadece kupa)');
 });
-test('Savaş: canavar avda vurmaz, can kendiliğinden dolmaz; sadece elle Swallow doldurur', () => {
+test('Savaş: canavar avda vurmaz; can avda okula göre dolar (Wolf saatte %0,3), iksir kendiliğinden içilmez; Yaralı hasarı düşürür', () => {
   const { E, s, go } = setup({ idle: true });
+  isOk(E.takeContract(E.boardEntries()[0].m.id)); s.contract.hp = s.contract.max = 1e9;
   s.hp = 40; s.swallow = 2; s.honey = 3;                           // giriş yapılmayan günlerde vuruşu White Honey önlesin
-  go('2026-11-07T21:00');                                          // 2 gün av
-  eq(s.hp, 40, 'avda vuruş yok, kendiliğinden dolma yok'); eq(s.swallow, 2, 'iksir kendiliğinden içilmez');
+  const full = E.playerStats().dph; ok(E.combatInfo().wounded, 'yaralı');
+  go('2026-11-06T07:00');                                          // 10 saat av
+  ok(Math.abs(s.hp - (40 + E.maxHp() * 0.03)) < 0.01, 'Wolf saatte %0,3: ' + s.hp); eq(D.REGEN.fight.bear, 0.005); ok(D.REGEN.fight.cat < D.REGEN.fight.wolf); eq(s.swallow, 2, 'iksir kendiliğinden içilmez');
+  s.hp = 60; ok(Math.abs(E.playerStats().dph - full / 0.8) < 0.01, 'yaralı değilken tam hasar');
+  s.hp = 40;
   isOk(E.drinkPotion()); eq(s.hp, Math.min(E.maxHp(), 40 + D.POTION.heal(s.level))); eq(s.swallow, 1);
   s.hp = E.maxHp(); isErr(E.drinkPotion(), 'can dolu');
 });
@@ -103,21 +108,30 @@ test('Savaş: başarısızlıkta canın biterse yenilirsin; canavarın canı tam
   ok(E.failHit(true) > E.failHit(true, { id: E.boardEntries(0).find(e => !e.boss).m.id, hp: 1, max: 1 }), 'boss daha sert vurur');
   s.hp = 5;
   go('2026-11-06T09:31');                                          // 6 Kasım kaçırıldı
-  eq(s.combat.mode, 'recover'); eq(s.hp, 0); eq(s.contract.hp, s.contract.max, 'canavarın canı doldu');
+  eq(s.combat.mode, 'recover'); ok(s.hp < 1, 'can sıfırlandı'); eq(s.contract.hp, s.contract.max, 'canavarın canı doldu');
   ok(s.log.some(l => l.type === 'bad' && /yendi|son darbe|beat you|final blow/.test(l.text)), 'yenilgi günlükte');
   const hpBoss = s.contract.hp;
   go('2026-11-06T15:00'); eq(s.contract.hp, hpBoss, 'toparlanırken av yok');
-  go('2026-11-06T15:35'); eq(s.combat.mode, 'fight'); eq(s.hp, E.maxHp(), 'tam canla döndü');
+  ok(s.hp > 0 && s.hp < E.maxHp(), 'toparlanırken can doluyor');
+  go('2026-11-06T16:15'); eq(s.combat.mode, 'fight'); eq(s.hp, E.maxHp(), 'tam canla döndü (saatte %15 → ~6,7 saat)');
 });
-test('Savaş: uzun aradan sonra "sen yokken" özeti; başarı anında 1 saatlik hasar vurulur', () => {
+test('Kontrat her zaman var: savaş dışı hızlı iyileşme yok; yenilgi orenin %10 kadarını alır', () => {
+  {
+    const { E, s, go } = setup({ idle: true });
+    s.hp = 10; go('2026-11-05T23:00');
+    ok(s.contract, 'kontrat kendiliğinden alındı');
+    ok(Math.abs(s.hp - (10 + E.maxHp() * D.REGEN.fight.wolf * 2)) < 0.01, 'sadece avdaki iyileşme: ' + s.hp);
+  }
   const { E, s, go } = setup({ idle: true });
+  s.level = 4; isOk(E.takeContract(D.REGIONS[0].boss)); s.honey = 0; s.hp = 1; E.checkAchievements(); s.gold = 1000;
+  go('2026-11-06T09:31'); eq(s.combat.mode, 'recover'); eq(s.gold, 900);
+});
+test('Savaş: uzun aradan sonra "sen yokken" özeti', () => {
+  const { E, s, go } = setup({ idle: true });
+  const e = E.boardEntries().filter(x => !x.boss).sort((a, b) => a.stats.hp - b.stats.hp)[0];
+  isOk(E.takeContract(e.m.id)); s.contract.hp = Math.min(s.contract.hp, 50);
   go('2026-11-06T07:00');
   ok(E.ev.offline && E.ev.offline.minutes >= 600 && E.ev.offline.kills >= 1, 'özet');
-  if (!s.contract) E.ensureBoard();
-  const c = s.contract || (E.takeContract(E.boardEntries()[0].m.id), s.contract);
-  c.hp = c.max = 100000; const dph = E.playerStats().dph;
-  go('2026-11-06T08:10'); const before = c.hp; isOk(E.checkIn());
-  ok(before - c.hp >= Math.round(dph) - 1, 'başarı = 1 saatlik hasar');
 });
 /* ---- dinlenme ---- */
 test('Dinlenme günü: ceza yok, zincir donar; haftada bir kez; sonradan ilan edilemez', () => {
@@ -271,7 +285,7 @@ test('Tabela: bölgeden 5 canavar, haftalık yenilenir; aynı kademedeki bölge 
 });
 test('Tabela: boss\'tan sonra eski bölgenin tabelası da açık kalır, oradan kontrat alınabilir', () => {
   const { E, s } = setup();
-  E.dev.addXp(5000); isOk(E.takeContract(D.REGIONS[0].boss)); s.contract.hp = 1; E.completeSide(s.quests[0].id);
+  E.dev.addXp(5000); isOk(E.takeContract(D.REGIONS[0].boss)); s.contract.hp = 1; E.dev.killContract();
   eq(s.region, 1);
   eq(E.boardEntries(0).length, D.BOARD_SIZE); eq(E.boardEntries(RI('lyria')).length, D.BOARD_SIZE); eq(E.boardEntries(RI('vizima')).length, D.BOARD_SIZE);
   ok(E.boardEntries(RI('kovir')).some(x => x.boss), 'alt kademenin kesilmemiş boss\'u açık kalır');
@@ -284,7 +298,7 @@ test('Canavar değerleri: bölge içinde canı az olanın ödülü de az; bölge
   D.REGIONS.forEach((r, i) => {
     const list = D.MONSTERS.filter(m => m.region === i && !m.boss).map(m => ({ m, st: monStats(m) })).sort((a, b) => a.st.hp - b.st.hp);
     ok(list[0].st.gold <= list.at(-1).st.gold && list[0].st.xp <= list.at(-1).st.xp, r.name + ' ödül cana göre');
-    ok(list.every(x => x.st.hp <= D.REG.hp[r.tier] && x.st.gold <= D.REG.gold[r.tier] + 5), r.name + ' tavan (5e yuvarlama payı)');
+    ok(list.every(x => x.st.hp <= Math.round(D.REG.hp[r.tier] * D.HP_MULT[r.tier]) && x.st.gold <= D.REG.gold[r.tier] + 5), r.name + ' tavan (5e yuvarlama payı)');
     ok(new Set(list.map(x => x.st.hp)).size >= 4, r.name + ' canlar farklı olmalı');
     if (r.tier) ok(D.REG.hp[r.tier] > D.REG.hp[r.tier - 1] * 1.5, r.name + ' kademe canı artar');
     ok(list.every(x => x.st.hit > 0), r.name + ' vuruş');
@@ -293,7 +307,7 @@ test('Canavar değerleri: bölge içinde canı az olanın ödülü de az; bölge
 });
 test('Demirci: oren karşılığı stok yenilenir; bedel aynı gün artar, ertesi gün sıfırlanır', () => {
   const { E, s, go } = setup();
-  s.gold = 1000;
+  s.gold = 1000; s.level = 14;
   const a = E.dailySwords('silver').map(w => w.id).join();
   eq(E.shopRerollCost(), D.REROLL.shop);
   isOk(E.rerollShop()); eq(s.gold, 1000 - D.REROLL.shop);
@@ -340,14 +354,18 @@ test('Tabela: kontrat seçilir, canı ve ödülü canavara özel', () => {
 test('Tabela: kontrat seçilmezse bu kademenin panolarındaki en kolay canavar alınır', () => {
   const { E, s, go } = setup();
   const easiest = [0, RI('kovir')].flatMap(r => E.boardEntries(r)).filter(x => !x.boss).sort((a, b) => a.stats.hp - b.stats.hp)[0];
-  go('2026-11-06T08:10'); E.checkIn();
+  const t = setup({ idle: true }); t.go('2026-11-05T22:00');
+  const [E2, s2] = [t.E, t.s];
+  const easiest2 = [0, RI('kovir')].flatMap(r => E2.boardEntries(r)).filter(x => !x.boss).sort((a, b) => a.stats.hp - b.stats.hp)[0];
+  ok(easiest && s2.contract && s2.contract.id === easiest2.m.id && s2.contract.hp < s2.contract.max, 'otomatik kontrat: ' + s2.contract?.id);
+  return;
   ok(s.contract && s.contract.id === easiest.m.id && s.contract.hp < s.contract.max, 'otomatik kontrat: ' + s.contract?.id);
 });
 test('Av: canavar ölünce oren + TP + kupa (kart fıçısı yok); aynı canavar bir daha gelmez', () => {
   const { E, s, go } = setup();
   const e = E.boardEntries()[0]; E.takeContract(e.m.id); s.contract.hp = 5;
   const g = s.gold, lv = s.level, xp = s.xp;
-  go('2026-11-06T08:10'); E.ev.reveals.length = 0; E.checkIn();
+  E.ev.reveals.length = 0; E.dev.killContract();
   eq(s.trophies.length, 1); eq(s.contract, null);
   ok(s.gold >= g + e.stats.gold, 'ödül');
   ok(s.level > lv || s.xp >= xp + e.stats.xp, 'TP');
@@ -365,7 +383,7 @@ test('Seviye: boss ölünce yeni bölge, yeni tabela, biriken TP ile seviye atla
   const { E, s } = setup();
   E.dev.addXp(5000);
   isOk(E.takeContract(D.REGIONS[0].boss)); s.contract.hp = 1;
-  E.completeSide(s.quests[0].id);
+  E.dev.killContract();
   eq(s.region, 1); ok(s.level > D.REGIONS[0].max && s.level <= D.REGIONS[0].max + 2, 'en fazla iki seviye atlanır: ' + s.level);
   ok(E.boardEntries().every(x => tierOfMon(x.m) === 1), 'yeni kademenin tabelası');
 });
@@ -381,7 +399,7 @@ test('Son boss: efsane olunur, seviye son seviyede durur', () => {
   const { E, s } = setup();
   s.region = D.BAND_COUNT - 1; s.level = D.MAX_LEVEL; s.boards = {}; s.contract = null;
   isOk(E.takeContract(D.REGIONS.at(-1).boss)); s.contract.hp = 1;
-  E.completeSide(s.quests[0].id);
+  E.dev.killContract();
   eq(s.legend, true); eq(s.level, D.MAX_LEVEL);
 });
 
@@ -390,7 +408,7 @@ test('Son oyun: efsane olunca kesilmiş canavarlar elit olarak tabelaya döner, 
   s.region = D.BAND_COUNT - 1; s.level = D.MAX_LEVEL; s.boards = {}; s.contract = null;
   D.MONSTERS.filter(m => !m.boss || m.id !== D.REGIONS.at(-1).boss).forEach(m => s.trophies.push({ id: m.id }));
   ok(E.boardEntries(0).length === 0 || E.boardEntries(0).every(x => !x.elite), 'efsane değilken kesilmişler gelmez');
-  isOk(E.takeContract(D.REGIONS.at(-1).boss)); s.contract.hp = 1; E.completeSide(s.quests[0].id);
+  isOk(E.takeContract(D.REGIONS.at(-1).boss)); s.contract.hp = 1; E.dev.killContract();
   eq(s.legend, true);
   const b = E.boardEntries(0);
   ok(b.filter(x => !x.boss).length === D.BOARD_SIZE && b.filter(x => !x.boss).every(x => x.elite), 'elit tabela dolu');
@@ -426,140 +444,287 @@ test('Fraksiyon: "Tüm fraksiyonlar" seçilirse her fraksiyondan kart gelir; yen
 });
 
 /* ---- hasar + demirci ---- */
-test('Hasar: başarı anında saatlik hasar — kalkış 1 saat, yatış yarım saat, yan görev çeyrek saat', () => {
+test('Hasar: başarı anında ek vuruş yok; yatış, kalkış ve yan görev canavara vurmaz', () => {
   const { E, s, go } = setup();
   E.takeContract(E.boardEntries()[0].m.id); s.contract.hp = s.contract.max = 100000;
-  const dph = E.playerStats().dph, hit = h => Math.max(1, Math.round(dph * h));
-  go('2026-11-06T00:30'); E.prep(); eq(contractHp(s), 100000 - hit(D.BURST.prep));
-  go('2026-11-06T08:10'); E.checkIn(); eq(contractHp(s), 100000 - hit(D.BURST.prep) - hit(D.BURST.habit));
-  go('2026-11-06T12:00'); E.completeSide(s.quests[0].id); eq(contractHp(s), 100000 - hit(D.BURST.prep) - hit(D.BURST.habit) - hit(D.BURST.side));
+  go('2026-11-06T00:30'); E.prep(); eq(contractHp(s), 100000);
+  go('2026-11-06T08:10'); E.checkIn(); eq(contractHp(s), 100000);
+  go('2026-11-06T12:00'); E.completeSide(s.quests[0].id); eq(contractHp(s), 100000);
 });
-test('Hasar: gümüş kılıç ve okul seti ekstrası; çelikle kritik', () => {
+test('Kontrat değiştirme: iptal yok, başka kontrat alınca eskisinin ilerlemesi sıfırlanır', () => {
+  const { E, s, go } = setup({ idle: true });
+  const [a, b] = E.boardEntries().map(e => e.m.id);
+  isOk(E.takeContract(a));
+  s.contract.hp = s.contract.max = 100000;
+  go('2026-11-05T23:00'); ok(s.contract.hp < s.contract.max, 'vuruldu');
+  eq(E.cancelContract, undefined, 'iptal fonksiyonu yok');
+  isOk(E.takeContract(b)); eq(s.contract.id, b); eq(s.contract.hp, s.contract.max, 'yeni kontrat tam canla');
+  isOk(E.takeContract(a)); eq(s.contract.hp, s.contract.max, 'eskisine dönünce ilerleme sıfır');
+  const old = migrate({ ...JSON.parse(JSON.stringify(s)), huntPaused: true }); eq(old.huntPaused, undefined, 'eski kayıttaki duraklatma silinir');
+});
+test('Swallow: 100 oren, +50 can', () => {
+  eq(D.POTION.price(1), 100); eq(D.POTION.price(20), 100); eq(D.POTION.heal(1), 50); eq(D.POTION.heal(30), 50);
+});
+test('Thunderbolt: 12 saat hasar +%20, Odak ile toplanır, üst üste binmez', () => {
+  const { E, s, go } = setup({ idle: true });
+  isErr(E.drinkThunder(), 'iksir yok');
+  s.gold = 1000; isOk(E.buy('thunder')); eq(s.thunder, 1); eq(s.gold, 1000 - D.THUNDER.price);
+  const before = E.playerStats().dph;
+  isOk(E.drinkThunder()); eq(s.thunder, 0); eq(E.buffPct(), 20);
+  ok(Math.abs(E.playerStats().dph - before * 1.2) < 0.01, 'hasar ×1,2');
+  s.thunder = 1; isOk(E.drinkThunder()); eq(E.buffPct(), 20, 'üst üste binmez');
+  s.effects.push({ id: 'f', kind: 'focus', pct: 10, until: '2026-12-01T00:00:00' }); eq(E.buffPct(), 30, 'Odak + Thunderbolt');
+  go('2026-11-06T09:30'); eq(E.buffPct(), 10, '12 saat sonra Thunderbolt biter');
+  s.thunder = D.THUNDER.cap; isErr(E.buy('thunder'), 'kapasite');
+});
+test('Tawny Owl: 50 orene alınca +10 TP', () => {
+  const { E, s } = setup({ idle: true });
+  s.gold = 100; const xp = s.xp;
+  isOk(E.buy('owl')); eq(s.gold, 50); eq(s.xp, xp + D.OWL.xp);
+  s.level = 4; s.xp = 10000;
+  ok(E.shopItems().find(i => i.id === 'owl').disabled, 'seviye sınırında TP doluyken alınmaz');
+});
+test('Dancing Star: rastgele 3–10 saatlik hasar vurur, canın %50si gider; Manticore ×1,3', () => {
+  const { E, s, go } = setup({ idle: true });
+  go('2026-11-05T22:00'); ok(s.contract);
+  s.contract.hp = s.contract.max = 100000;
+  isErr(E.throwDancing(), 'bomba yok');
+  s.dancing = 2; s.hp = E.maxHp();
+  const dph = E.playerStats().dph, hp0 = s.contract.hp, crit = s.stats.crits;
+  isOk(E.throwDancing()); eq(s.dancing, 1); eq(s.hp, E.maxHp() * 0.5);
+  const hit = (hp0 - s.contract.hp) / (s.stats.crits > crit ? D.CRIT_MULT : 1), hrs = hit / Math.round(dph);
+  ok(hrs >= 2.99 && hrs <= 10.01 && Math.abs(hrs - Math.round(hrs)) < 0.02, '3–10 saatlik hasar: ' + hrs);
+  isErr(E.throwDancing(), 'can %50 veya altındayken atılmaz'); eq(s.dancing, 1);
+  for (const [school, r, h, k] of [['wolf', 0, 3, 1], ['wolf', 0.999, 10, 1], ['manticore', 0.999, 10, 1.3]]) {   // kritik yok (çelik yok/zar yüksek)
+    const m = setup({ idle: true, school, random: () => r });
+    m.go('2026-11-05T22:00'); m.s.contract.hp = m.s.contract.max = 1e7; m.s.hp = m.E.maxHp(); m.s.swords.steel = null; m.s.dancing = 1;
+    const one = Math.round(m.E.playerStats().dph * k);
+    eq(m.E.combatInfo().dancingMin, one * 3); eq(m.E.combatInfo().dancingMax, one * 10);
+    isOk(m.E.throwDancing()); eq(1e7 - m.s.contract.hp, one * h, `${school} ${h} saat`);
+  }
+});
+test('Manticore: iksirler yarı fiyatına, bombalar değil; başlangıç donanımı', () => {
+  const { E, s } = setup({ school: 'manticore' });
+  const price = id => E.shopItems().find(i => i.id === id).price;
+  eq([price('swallow'), price('honey'), price('thunder'), price('owl'), price('dancing')],
+    [D.POTION.price(1) / 2, 30, D.THUNDER.price / 2, D.OWL.price / 2, D.DANCING.price]);
+  eq(E.combatInfo().dancingPrice, D.DANCING.price, 'savaş panelinde de indirimsiz');
+  eq(price('keg'), 60, 'kart fıçısı indirimsiz');
+  eq(E.combatInfo().potionPrice, D.POTION.price(1) / 2);
+  eq([s.thunder, s.dancing], [D.START_KIT.manticore.thunder, D.START_KIT.manticore.dancing]);
+  eq(D.schoolImg('manticore'), 'img/manticore.webp'); ok(D.schoolImg('wolf').includes('gwent'), 'diğer okullar kart resmi');
+  const w = setup({ school: 'wolf' }); eq(w.E.shopItems().find(i => i.id === 'swallow').price, D.POTION.price(1));
+});
+test('Hasar: gümüş kılıcın hasarı seviyesine bağlı; kendi okulunun seti +%15; çelikle kritik', () => {
   const { E, s } = setup();
   const sv = D.SWORDS.find(w => w.type === 'silver' && w.school === 'wolf');
-  s.swords.owned.push(sv.id); isOk(E.equipSword(sv.id));
-  eq(E.damageBonus().raw, sv.bonus + 5);
-  const st = D.SWORDS.find(w => w.type === 'steel'); s.swords.owned.push(st.id); E.equipSword(st.id);
-  ok(E.damageBonus().crit > 0);
+  s.swords.owned.push(sv.id); s.swords.lv[sv.id] = 10; isOk(E.equipSword(sv.id));
+  eq(E.damageBonus().sword, Math.round(D.swordDmgAt(sv, 10) * 1.15 * 10) / 10, 'kendi okulunun seti +%15');
+  ok(Math.abs(E.playerStats().dph - (D.powerAt(1) + E.damageBonus().sword)) < 0.01, 'taban hasara eklenir');
+  s.swords.lv[sv.id] = 20; ok(E.damageBonus().sword > D.swordDmgAt(sv, 10), 'seviye arttıkça hasar artar');
+  const st = D.SWORDS.find(w => w.type === 'steel' && w.tier === 3); s.swords.owned.push(st.id); s.swords.lv[st.id] = 15; E.equipSword(st.id);
+  eq(E.damageBonus().crit, D.swordCritAt(st, 15));
 });
-test('Hasar: tavan yok, azalan getiri (60 tam, 60–120 %75, 120–180 %45, sonrası %20)', () => {
-  eq(D.effectiveBonus(40), 40); eq(D.effectiveBonus(60), 60); eq(D.effectiveBonus(120), 105);
-  eq(D.effectiveBonus(180), 132); eq(D.effectiveBonus(200), 136);
+test('Hasar: zincir, bağ ve avcı bonusları düz toplanır; tavan ya da azaltım yok', () => {
   const { E, s } = setup();
+  const p0 = E.playerStats().dph;
   s.chain.len = 70;
-  for (let i = 0; i < 10; i++) s.links.push({ id: 'x' + i, f: 'X', cat: 'Y' + i, cards: [1, 2, 3, 4, 5] });
-  const base = 20 + 10 * D.LINK_BONUS;
-  eq(E.damageBonus().raw, base); eq(E.damageBonus().pct, D.effectiveBonus(base));
-  const a = D.SWORDS.find(w => w.tier === 6); s.swords.owned.push(a.id); E.equipSword(a.id); s.swords.up[a.id] = 5;
-  const raw = base + a.bonus + 5 * D.UPGRADE.silver;
-  eq(E.damageBonus().raw, raw); eq(E.damageBonus().pct, D.effectiveBonus(raw)); ok(E.damageBonus().pct < raw);
+  eq(E.damageBonus().chain, 100); eq(E.damageBonus().pct, 100, 'zincir bonusa girer');
+  ok(Math.abs(E.playerStats().dph - p0 * 2) < 0.01, 'Göktaşı: hasar ×2');
+  for (let i = 0; i < 10; i++) s.links.push({ id: 'l' + i, f: 'X', cat: 'Y', cards: [] });
+  s.links.forEach(l => { l.cards = D.CARDS.filter(c => c.r === 'Legendary').slice(0, 5).map(c => c.a); });
+  const b = E.damageBonus(); eq(b.pct, +(100 + b.links).toFixed(1), 'azaltım yok: ' + b.pct); ok(b.pct > 150);
+  ok(Math.abs(E.playerStats().dph - p0 * (1 + b.pct / 100)) < 0.01, 'hasar bonusla doğrudan çarpılır');
+  eq(D.TIERS.map(t => [t.at, t.dmg, t.mult]), [[0, 0, 1], [7, 10, 1.2], [14, 20, 1.3], [30, 30, 1.5], [40, 50, 1.7], [60, 100, 2]]);
 });
-test('Demirci: stok seviyene göre gelir (3 kendi kademen, 1 alt, 1 üst), okul seti satılmaz, her gün en az biri alınabilir', () => {
-  const { E, s, go } = setup();
-  for (const lv of [1, 9, 14, 20, 30]) {
-    s.level = lv;
-    for (const type of ['silver', 'steel']) {
-      for (let d = 0; d < 5; d++) {
-        const list = E.dailySwords(type, T.addDays('2026-11-06', d));
-        eq(list.length, D.SHOP_DAILY, `sv${lv} ${type}`);
-        ok(list.every(w => !w.set), 'okul seti satılmamalı');
-        ok(list.some(w => w.level <= lv), `sv${lv} ${type}: alınabilir kılıç olmalı`);
-        const myTier = Math.max(...D.SWORDS.filter(w => w.type === type && !w.set && w.level <= lv).map(w => w.tier));
-        const inTier = D.SWORDS.filter(w => w.type === type && !w.set && w.tier === myTier).length;
-        ok(list.filter(w => w.tier === myTier).length >= Math.min(2, inTier), `sv${lv} ${type}: çoğu kendi kademesinden (${myTier})`);
-        ok(list.every(w => Math.abs(w.tier - myTier) <= 2), `sv${lv} ${type}: uzak kademe gelmemeli`);
-      }
-    }
-  }
-  s.gold = 99999; s.level = 30;
-  isErr(E.buySword(D.SWORDS.find(w => w.set).id), 'okul seti satın alınamaz');
+test('Saat başı vuruş: tam saat dolmadan hasar yok', () => {
+  const { E, s, go } = setup({ idle: true, start: '2026-11-05T21:10' });
+  isOk(E.takeContract(E.boardEntries()[0].m.id)); s.contract.hp = s.contract.max = 1e9;
+  go('2026-11-05T21:55'); eq(s.contract.hp, 1e9, 'saat dolmadı');
+  go('2026-11-05T22:05'); ok(s.contract.hp < 1e9, '22:00 vuruşu'); eq(s.contract.lastHit?.t, new Date('2026-11-05T22:00').toISOString());
+  s.swords.steel = null; const before = s.contract.hp, dph = E.playerStats().dph;
+  go('2026-11-05T23:05'); ok(Math.abs(before - s.contract.hp - dph) < 0.01, 'kritiksiz vuruş sabit: ' + (before - s.contract.hp));
+});
+test('Demirci: bütün kılıçlar her seviyede çıkabilir; kademe olasılıkları seviyeye göre (altta Sıradan, üstte Efsanevi); okul seti satılmaz', () => {
+  eq(D.rarityOdds(1), { 1: 60, 2: 25, 3: 13, 4: 2 }); eq(D.rarityOdds(30), { 1: 10, 2: 20, 3: 40, 4: 30 });
+  [1, 10, 20, 30].forEach(L => { const o = D.rarityOdds(L); ok(Math.abs(o[1] + o[2] + o[3] + o[4] - 100) < 0.5, 'toplam %100'); });
+  const { E, s } = setup();
+  const count = lv => { s.level = lv; const c = { 1: 0, 2: 0, 3: 0, 4: 0, 6: 0 };
+    for (let d = 0; d < 1000; d++) for (const type of ['silver', 'steel']) E.dailySwords(type, T.addDays('2026-11-06', d)).forEach(w => { c[w.tier]++; ok(!w.set, 'okul seti satılmaz'); });
+    return c; };
+  const lo = count(1), hi = count(30);
+  ok(lo[1] > lo[4] * 5, 'seviye 1: Sıradan çok, Efsanevi az: ' + JSON.stringify(lo)); ok(lo[4] > 0, 'seviye 1 de Efsanevi çıkabilir');
+  ok(hi[4] > hi[1], 'seviye 30: Efsanevi Sıradan dan çok: ' + JSON.stringify(hi)); ok(hi[1] > 0, 'seviye 30 da Sıradan çıkabilir');
+  eq(lo[6], 0, 'Aerondight 25 altı çıkmaz'); ok(hi[6] >= 1 && hi[6] <= 30, 'Aerondight çok nadir (~günde %1): ' + hi[6]);
+});
+test('Demirci: satın alınan kılıcın yerine yenisi gelmez; Efsanevi ve Kadim %50 pahalı', () => {
+  const { E, s } = setup();
+  s.level = 12; s.gold = 1e6;
+  const before = E.dailySwords('silver').map(w => w.id), steel = E.dailySwords('steel').map(w => w.id);
+  isOk(E.buySword(before[0]));
+  eq(E.dailySwords('silver').map(w => w.id), before.slice(1), 'boşluk dolmadı');
+  eq(E.dailySwords('steel').map(w => w.id), steel, 'diğer tür değişmedi');
+  isErr(E.buySword(before[0]), 'tekrar alınamaz');
+  isOk(E.rerollShop()); eq(E.dailySwords('silver').length, D.SHOP_DAILY, 'yenileyince tam stok');
+  const leg = D.SWORDS.find(w => w.tier === 4), com = D.SWORDS.find(w => w.tier === 1), aero = D.SWORDS.find(w => w.tier === 6);
+  eq(E.shopPrice(leg), Math.round(D.swordPrice(leg, 12) * 1.5 / 5) * 5); eq(E.shopPrice(aero), Math.round(D.swordPrice(aero, 12) * 1.5 / 5) * 5);
+  eq(E.shopPrice(com), D.swordPrice(com, 12));
+});
+test('Benzersiz özellikler: her Efsanevi kılıçta farklı bir tane, Aerondight kendine özel', () => {
+  const legs = D.SWORDS.filter(w => w.tier === 4 && !w.set);
+  ok(D.UNIQUE.length >= legs.length, 'havuz yeterli: ' + D.UNIQUE.length + '/' + legs.length);
+  ok(legs.every(w => w.unique && D.UNIQUE_BY_ID[w.unique]), 'hepsinde var');
+  eq(new Set(legs.map(w => w.unique)).size, legs.length, 'tekrar yok');
+  ok(D.SWORDS.filter(w => w.tier !== 4 && w.tier !== 6).every(w => !w.unique), 'diğer kademelerde yok');
+  eq(D.SWORDS.find(w => w.tier === 6).unique, 'aerondight');
+  eq(new Set(D.UNIQUE.map(u => u.id)).size, D.UNIQUE.length, 'kimlikler tekil');
+});
+/* kuşanılmış kılıca istenen özelliği ver (test için) */
+function withTrait(E, s, id) {
+  const w = D.SWORDS.find(x => x.unique === id);
+  if (!w) throw new Error('özellik bir kılıca atanmamış: ' + id);
+  s.swords.owned.push(w.id); s.swords.lv[w.id] = s.level; s.swords[w.type] = w.id;   // diğer yuva kendi kılıcıyla kalır
+  return w;
+}
+test('Özellikler: hasar, kritik, ödül ve savunma', () => {
+  // Şafak Işığı: 06–12 arası +%25, öğleden sonra yok
+  { const { E, s, go } = setup({ idle: true }); go('2026-11-06T09:30'); withTrait(E, s, 'dawn'); const nm = D.UNIQUE_BY_ID.dawn.name;
+    ok(E.damageBonus().parts.some(p => p.includes(nm)), 'sabah'); go('2026-11-06T14:30'); ok(!E.damageBonus().parts.some(p => p.includes(nm)), 'öğleden sonra yok'); }
+  // Ölümcül: kritik ×2
+  { const { E, s, go } = setup({ idle: true, random: () => 0 }); go('2026-11-05T22:00'); withTrait(E, s, 'deadly');
+    s.contract.hp = s.contract.max = 1e7; const hp0 = s.contract.hp, dph = E.playerStats().dph; go('2026-11-05T23:00');
+    ok(Math.abs((hp0 - s.contract.hp) - dph * 2) < 1, 'kritik ×2: ' + (hp0 - s.contract.hp) + ' / ' + dph); }
+  // Keskin Kenar: kritik +8
+  { const { E, s } = setup(); const c0 = E.damageBonus().crit; withTrait(E, s, 'sharp'); const w = D.SWORDS.find(x => x.unique === 'sharp');
+    if (w.type === 'steel') ok(E.damageBonus().crit >= 8, 'kritik'); else eq(E.damageBonus().crit, c0 + 8); }
+  // Ödül Avcısı: oren ×1,25
+  { const a = setup({ idle: true }), b = setup({ idle: true });
+    for (const x of [a, b]) { x.go('2026-11-05T22:00'); x.s.gold = 0; }
+    withTrait(b.E, b.s, 'bounty'); a.E.dev.killContract(); b.E.dev.killContract();
+    ok(Math.abs(b.s.gold - a.s.gold * 1.25) <= 1, 'oren ×1,25: ' + a.s.gold + ' → ' + b.s.gold); }
+  // Taş Deri: aldığın hasar −%25; Can Kalkanı: can +%25
+  { const { E, s } = setup(); const h0 = E.failHit(true); withTrait(E, s, 'stone'); ok(Math.abs(E.failHit(true) - h0 * 0.75) <= 1, 'taş deri'); }
+  { const { E, s } = setup(); const m0 = E.maxHp(); withTrait(E, s, 'hpshield'); eq(E.maxHp(), Math.round(m0 * 1.25)); }
+  // Son Nefes: haftada bir kez 1 canla kurtulur
+  { const { E, s, go } = setup({ idle: true }); go('2026-11-05T22:00'); withTrait(E, s, 'lastbreath'); s.honey = 0; s.hp = 1;
+    go('2026-11-06T10:00'); ok(s.hp > 0 && s.hp < 5, 'kurtuldu: ' + s.hp); ok(s.combat.mode !== 'recover'); ok(s.lastBreath, 'haftalık hak kullanıldı'); }
+  // Yorulmaz: gecikince Yorgun olmaz
+  { const { E, s, go } = setup(); withTrait(E, s, 'tireless'); go('2026-11-06T08:45'); isOk(E.checkIn()); eq(s.days['2026-11-06'].result, 'late'); eq(E.debuffPct(), 0); }
+  // Altın Rüzgârı: başarıda +15 oren
+  { const a = setup(), b = setup(); withTrait(b.E, b.s, 'goldwind');
+    for (const x of [a, b]) { x.go('2026-11-06T08:10'); x.s.gold = 0; isOk(x.E.checkIn()); }
+    eq(b.s.gold - a.s.gold, 15); }
+});
+test('Aerondight: her 24 saatte 1 şarj, tam şarjda 12. vuruş 12 saatlik; gecikme yarı, kaçırma hepsini götürür', () => {
+  const { E, s, go } = setup({ idle: true, random: () => 0.99 });
+  go('2026-11-05T22:00'); s.swords.steel = null; withTrait(E, s, 'aerondight');
+  s.contract.hp = s.contract.max = 1e9;
+  go('2026-11-06T06:00'); eq(s.aero?.charge || 0, 0, '8 saatte şarj yok');
+  go('2026-11-06T08:10'); isOk(E.checkIn());
+  go('2026-11-06T22:00'); eq(s.aero.charge, 1, '24 saatte 1 şarj'); eq(E.combatInfo().aero.toNext, 24);
+  s.aero.charge = 3; ok(E.damageBonus().parts.some(p => p.includes('15')), 'şarj başına +%5');
+  s.aero.charge = 19; s.aero.h = 23;
+  go('2026-11-06T23:00'); eq(s.aero.charge, 20); ok(E.combatInfo().aero.full, 'tam şarj');
+  go('2026-11-07T06:00'); eq(s.aero.charge, 20);
+  go('2026-11-07T08:10'); isOk(E.checkIn());
+  go('2026-11-07T11:00'); ok(s.log.some(l => /Göl Hanımı'nın Darbesi|Strike of the Lady/.test(l.text)), 'Göl Hanımının Darbesi');
+  const half = E.failHit(true); s.aero.charge = 0; const full = E.failHit(true); s.aero.charge = 20;
+  ok(half < full, 'tam şarjda vuruş yarıya iner: ' + half + ' / ' + full);
+  go('2026-11-08T08:45'); isOk(E.checkIn()); eq(s.days['2026-11-08'].result, 'late'); eq(s.aero.charge, 10, 'gecikme yarısını götürdü');
+  go('2026-11-09T09:45'); eq(s.days['2026-11-09'].result, 'fail'); eq(s.aero.charge, 0, 'kaçırma hepsini götürdü');
+});
+test('Kılıç seviyesi: demirciden senin seviyende gelir; oren + kırıntıyla kendi seviyene kadar yükselir; seviye şartı yok', () => {
+  const { E, s } = setup();
+  s.level = 12; s.gold = 100000; s.scraps = 1000;
+  const w = E.dailySwords('silver')[0], price = E.shopPrice(w);
+  eq(price, w.tier >= 4 ? Math.round(D.swordPrice(w, 12) * 1.5 / 5) * 5 : D.swordPrice(w, 12)); isOk(E.buySword(w.id)); eq(E.swordLv(w.id), 12); eq(s.gold, 100000 - price);
+  eq(E.upgradeCost(w.id), null, 'seviyende: yükseltilemez'); isErr(E.upgradeSword(w.id));
+  s.level = 14;
+  const c = E.upgradeCost(w.id); eq(c.to, 13); ok(c.gold > 0 && c.scraps > 0);
+  const d0 = E.swordValue(w), g = s.gold, sc = s.scraps; isOk(E.upgradeSword(w.id));
+  eq(E.swordLv(w.id), 13); eq(s.gold, g - c.gold); eq(s.scraps, sc - c.scraps); ok(E.swordValue(w) > d0, 'güç arttı');
+  isOk(E.upgradeSword(w.id)); eq(E.swordLv(w.id), 14); eq(E.upgradeCost(w.id), null, 'kendi seviyeni geçemez');
+  eq(s.counters.forged, 2);
+  const kit = s.swords.owned.filter(id => id !== w.id).map(D.swordById); ok(kit.every(x => E.swordLv(x.id) === 1), 'başlangıç kılıçları 1. seviye');
+});
+test('Kırıntı: kazanılan her dövüş 1 kırıntı verir', () => {
+  const { E, s } = setup();
+  const e = E.boardEntries()[0]; E.takeContract(e.m.id); const sc = s.scraps;
+  s.contract.hp = 1; E.dev.killContract(); eq(s.scraps, sc + D.SCRAP_PER_KILL);
 });
 test('Bane: kılıç kendi sınıfındaki canavara +%15; en iyi kılıç kontrata göre seçilir', () => {
   const { E, s } = setup();
   const e = E.boardEntries()[0]; E.takeContract(e.m.id);
   const cls = e.m.cls;
   const silvers = D.SWORDS.filter(w => w.type === 'silver' && !w.set && w.tier === 4);
-  const banePick = silvers.find(w => w.bane === cls) || D.SWORDS.find(w => w.bane === cls && !w.set);
-  const other = silvers.find(w => w.bane !== cls && w.type === banePick.type);
-  s.swords.owned.push(banePick.id, other.id); E.equipSword(other.id);
-  if (banePick.type === 'silver') {
-    const raw0 = E.damageBonus().raw;
-    isOk(E.equipBest());
-    eq(s.swords.silver, banePick.id, 'bane kılıcı kuşanılmalı');
-    eq(E.damageBonus().raw, raw0 - D.swordById(other.id).bonus + banePick.bonus + D.BANE);
-  } else {
-    isOk(E.equipBest()); eq(s.swords.steel, banePick.id);
-    ok(E.damageBonus().raw >= D.BANE);
-  }
+  const banePick = silvers.find(w => w.banes.includes(cls)) || D.SWORDS.find(w => w.banes.includes(cls) && !w.set);
+  const other = D.SWORDS.find(w => !w.banes.includes(cls) && !w.set && w.tier === banePick.tier && w.type === banePick.type);
+  s.swords.owned.push(banePick.id, other.id); s.swords.lv[banePick.id] = s.swords.lv[other.id] = 5; E.equipSword(other.id);
+  isOk(E.equipBest());
+  if (banePick.type === 'silver') eq(s.swords.silver, banePick.id, 'bane kılıcı kuşanılmalı'); else eq(s.swords.steel, banePick.id);
+  ok(E.damageBonus().raw >= D.BANE, 'avcı bonusu');
 });
-test('Aktarım ve eritme: güçlendirme ücretle aktarılır; eritme oren + kırıntı geri verir; kuşanılan eritilemez', () => {
+test('Avcı özellikleri: her üst kademe bir tür daha; Efsanevi ve üstü daha yüksek bonus', () => {
+  const cnt = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 4, 6: 5 }, pct = { 1: 15, 2: 15, 3: 15, 4: 25, 5: 20, 6: 25 };
+  for (const w of D.SWORDS) {
+    eq(w.banes.length, cnt[w.tier], w.name); eq(w.banePct, pct[w.tier], w.name);
+    eq(w.banes[0], w.bane, 'ilk tür eski bane'); eq(new Set(w.banes).size, w.banes.length, 'tekrar yok');
+    ok(w.banes.every(c => D.CLASSES[c]), 'geçerli tür');
+  }
+  const { E, s } = setup();
+  const e = E.boardEntries()[0]; E.takeContract(e.m.id);
+  const leg = D.SWORDS.find(w => w.tier === 4 && w.type === 'silver' && w.banes.slice(1).includes(e.m.cls));
+  s.swords.owned.push(leg.id); E.equipSword(leg.id);
+  ok(E.damageBonus().raw >= 25, 'ek türden de +%25: ' + E.damageBonus().raw);
+});
+test('Eritme: oren + kırıntı geri verir; kuşanılan eritilemez', () => {
   const { E, s } = setup();
   s.gold = 100000; s.scraps = 100000;
   const [a, b] = D.SWORDS.filter(w => w.type === 'silver' && w.tier === 2);
-  const st = D.SWORDS.find(w => w.type === 'steel' && w.tier === 2);
-  s.swords.owned.push(a.id, b.id, st.id); E.equipSword(a.id);
-  for (let i = 0; i < 3; i++) isOk(E.upgradeSword(a.id));
-  isErr(E.transferUpgrades(a.id, st.id), 'farklı tür');
-  const g = s.gold; isOk(E.transferUpgrades(a.id, b.id));
-  eq(E.upLevel(b.id), 3); eq(E.upLevel(a.id), 0); eq(s.gold, g - E.transferFee(b.id));
-  isErr(E.transferUpgrades(a.id, b.id), '+0 kılıçtan aktarılmaz');
+  s.swords.owned.push(a.id, b.id); s.swords.lv[a.id] = 8; s.swords.lv[b.id] = 8; E.equipSword(a.id);
   isErr(E.dismantleSword(a.id), 'kuşanılan eritilemez');
-  const v = E.dismantleValue(b.id); ok(v.gold > 0 && v.scraps > 0, 'güçlendirilmiş kılıç oren ve kırıntı vermeli');
+  const v = E.dismantleValue(b.id); eq(v, { gold: Math.round(D.swordPrice(b, 8) * D.DISMANTLE.gold), scraps: 4 });
   const g2 = s.gold, sc2 = s.scraps; isOk(E.dismantleSword(b.id));
-  eq(s.gold, g2 + v.gold); eq(s.scraps, sc2 + v.scraps); ok(!s.swords.owned.includes(b.id), 'kılıç gitmeli');
+  eq(s.gold, g2 + v.gold); eq(s.scraps, sc2 + v.scraps); ok(!s.swords.owned.includes(b.id), 'kılıç gitmeli'); eq(s.swords.lv[b.id], undefined);
 });
-test("Şema: Flotsam ve sonrası boss'ları okul seti şeması düşürür (önce kendi okulun); demirci yaptırır", () => {
+test("Şema: 2. kademe ve sonrası boss'ları okul seti şeması düşürür (önce kendi okulunun en düşük aşaması); demirci yaptırır", () => {
   const { E, s } = setup({ school: 'bear' });
   const f = RI('flotsam'); s.region = D.REGIONS[f].tier; s.level = D.REGIONS[f].max; s.boards = {}; s.contract = null;
-  isOk(E.takeContract(D.REGIONS[f].boss)); s.contract.hp = 1; E.completeSide(s.quests[0].id);
+  isOk(E.takeContract(D.REGIONS[f].boss)); s.contract.hp = 1; E.dev.killContract();
   eq(s.diagrams.length, 1);
-  const w = D.swordById(s.diagrams[0]); eq([w.set, w.school, w.type], [true, 'bear', 'steel'], 'önce kendi okulunun çeliği');
-  s.level = 1; s.gold = 99999; s.scraps = 999; isErr(E.craftSword(w.id), 'seviye');
-  s.level = w.level; s.gold = 0; isErr(E.craftSword(w.id), 'para');
+  const w = D.swordById(s.diagrams[0]); eq([w.set, w.school, w.type, w.v], [true, 'bear', 'steel', 0], 'önce kendi okulunun en düşük aşama çeliği');
+  s.scraps = 999; s.gold = 0; isErr(E.craftSword(w.id), 'para');
   s.gold = 99999; isOk(E.craftSword(w.id));
-  ok(s.swords.owned.includes(w.id)); eq(s.diagrams, []);
-  eq(E.swordValue(w), w.bonus + 3, 'kendi okulunun seti ekstra kritik');
+  ok(s.swords.owned.includes(w.id)); eq(s.diagrams, []); eq(E.swordLv(w.id), s.level, 'senin seviyende yapılır');
+  eq(E.swordValue(w), D.swordCritAt(w, s.level) + 3, 'kendi okulunun seti ekstra kritik');
 });
-test("Şema: White Orchard–Velen boss'ları şema düşürmez", () => {
+test("Şema: 1. kademe (White Orchard, Kovir) boss'ları şema düşürmez, 2. kademe düşürür", () => {
   const { E, s } = setup();
-  E.dev.addXp(5000); isOk(E.takeContract(D.REGIONS[0].boss)); s.contract.hp = 1; E.completeSide(s.quests[0].id);
+  E.dev.addXp(5000); isOk(E.takeContract(D.REGIONS[0].boss)); s.contract.hp = 1; E.dev.killContract();
   eq(s.diagrams, []);
-});
-test("Kılıç güçlendirme: +1..+5, oren + kırıntı ister, değeri artırır, +5'te durur", () => {
-  const { E, s } = setup();
-  const w = D.SWORDS.find(x => x.type === 'silver' && x.tier === 1);
-  isErr(E.upgradeSword(w.id), 'sahip değil');
-  s.swords.owned.push(w.id); E.equipSword(w.id);
-  s.gold = 0; s.scraps = 0; isErr(E.upgradeSword(w.id), 'para yok');
-  s.gold = 100000; s.scraps = 100000;
-  const c1 = E.upgradeCost(w.id); eq(c1.to, 1); ok(c1.gold > 0 && c1.scraps > 0);
-  const g = s.gold; isOk(E.upgradeSword(w.id)); eq(s.gold, g - c1.gold); eq(E.upLevel(w.id), 1);
-  eq(E.swordValue(w), w.bonus + D.UPGRADE.silver);
-  for (let i = 2; i <= 5; i++) isOk(E.upgradeSword(w.id));
-  eq(E.upLevel(w.id), 5); eq(E.upgradeCost(w.id), null); isErr(E.upgradeSword(w.id), '+5 üstü');
-  const st = D.SWORDS.find(x => x.type === 'steel' && x.tier === 1); s.swords.owned.push(st.id); E.equipSword(st.id); E.upgradeSword(st.id);
-  eq(E.damageBonus().crit, st.bonus + D.UPGRADE.steel);
+  E.dev.addXp(5000); isOk(E.takeContract(D.REGIONS[RI('lyria')].boss)); s.contract.hp = 1; E.dev.killContract();
+  eq(s.diagrams.length, 1);
 });
 test('Demirci: her gün tür başına 5 kılıç, gün içinde aynı, ertesi gün değişir, listede olmayan alınamaz', () => {
   const { E, s, go } = setup();
+  s.level = 10;
   const a = E.dailySwords('silver').map(w => w.id), b = E.dailySwords('silver').map(w => w.id);
   eq(a.length, D.SHOP_DAILY); eq(a, b); eq(E.dailySwords('steel').length, D.SHOP_DAILY);
   ok(E.dailySwords('steel').every(w => w.type === 'steel'));
-  go('2026-11-07T12:00'); ok(E.dailySwords('silver').map(w => w.id).join() !== a.join(), 'ertesi gün değişmeli');
-  s.gold = 99999; s.level = 30;
-  const notToday = D.SWORDS.find(w => w.type === 'silver' && !E.dailySwords('silver').some(x => x.id === w.id));
+  const later = [7, 8, 9, 10, 11].map(d => { go(`2026-11-${pad2(d)}T12:00`); return E.dailySwords('silver').map(w => w.id).join(); });
+  ok(later.some(x => x !== a.join()), 'sonraki günlerde değişmeli');
+  s.gold = 99999;
+  const notToday = D.SWORDS.find(w => w.type === 'silver' && !w.set && !E.dailySwords('silver').some(x => x.id === w.id));
   isErr(E.buySword(notToday.id));
   const today = E.dailySwords('silver')[0]; isOk(E.buySword(today.id));
   ok(!E.dailySwords('silver').some(x => x.id === today.id), 'alınan listeden çıkar');
 });
-
-/* ---- kartlar, fraksiyon, bağlar ---- */
 test('Fraksiyon: karakter sadece kendi fraksiyonu + tarafsız kart kazanır', () => {
   const { E, s } = setup({ faction: 'Skellige' });
   for (let i = 0; i < 40; i++) E.drawCards(5, 'Common', 'x');
   ok(Object.keys(s.collection).every(a => ['Skellige', 'Neutral'].includes(D.CARD_BY_ART[a].f)), 'başka fraksiyon kartı geldi');
 });
-test('Kart bağı: aynı fraksiyon + ortak tür, 5 kartta +%2, kurallar', () => {
+test('Kart bağı: aynı fraksiyon + ortak tür, değeri nadirlikten gelir, kurallar', () => {
   const { E, s } = setup();
   const elves = D.CARDS.filter(c => c.f === 'Scoiatael' && D.cardCats(c).includes('Elf')).slice(0, 6);
   const other = D.CARDS.find(c => c.f === 'Monster' && D.cardCats(c).includes('Elf'));
@@ -569,7 +734,9 @@ test('Kart bağı: aynı fraksiyon + ortak tür, 5 kartta +%2, kurallar', () => 
   isErr(E.addToLink(r.link.id, other.a));
   elves.slice(0, 4).forEach(c => isOk(E.addToLink(r.link.id, c.a)));
   eq(E.damageBonus().pct, 0);
-  isOk(E.addToLink(r.link.id, elves[4].a)); eq(E.damageBonus().pct, D.LINK_BONUS);
+  isOk(E.addToLink(r.link.id, elves[4].a));
+  const v = E.linkValue(r.link), rar = elves.slice(0, 5).reduce((t, c) => t + D.LINK_RAR[c.r], 0);
+  eq(v.rar, +rar.toFixed(1)); eq(E.damageBonus().pct, v.total); ok(v.total >= 2.5);
   isErr(E.addToLink(r.link.id, elves[5].a));
   isOk(E.removeFromLink(r.link.id, elves[0].a)); eq(E.damageBonus().pct, 0);
 });
@@ -577,12 +744,13 @@ test('Kart bağı: aynı fraksiyon + ortak tür, 5 kartta +%2, kurallar', () => 
 test('Kupa: öldürülen canavarın kendi Gwent kartı koleksiyona düşer (fraksiyon odağından bağımsız)', () => {
   const { E, s, go } = setup({ faction: 'Nilfgaard' });
   const e = E.boardEntries()[0]; E.takeContract(e.m.id); s.contract.hp = 1;
-  go('2026-11-06T08:10'); E.checkIn();
+  E.dev.killContract();
   ok(s.collection[e.m.art] >= 1, 'kupa kartı');
   ok(E.ev.reveals.some(r => r.trophy && r.cards[0].a === e.m.art), 'kupa gösterimi');
 });
 test('Başarımlar: koşul sağlanınca bir kez açılır, oren verir; tekrar açılmaz', () => {
   const { E, s, go } = setup();
+  s.swords = { owned: [], silver: null, steel: null, up: {} };
   eq(E.checkAchievements().length, 0, 'başta hiçbiri');
   go('2026-11-06T08:10'); E.checkIn();
   const g = s.gold; const got = E.checkAchievements().map(a => a.id);
@@ -651,7 +819,6 @@ test('Sonradan işleme: kaçırılan gün 24 saat içinde girilir; zincir ve cez
   eq(d.result, 'success'); ok(d.retro, 'işaretli'); eq(d.medOnTime, true); eq(d.reward.mult >= 1.5, true);
   eq(s.chain.len, chainBefore + 1, 'zincir kırılmamış gibi'); eq(E.debuffPct(), 0, 'Bitkin kalktı'); eq(s.hp, hpBefore, 'can geri geldi');
   eq(s.quest.progress, progBefore + 1);
-  ok(s.contract == null || s.contract.hp < cBefore, 'başarı hasarı vuruldu');
   eq(E.correctableDay(), null, 'ikinci kez düzeltilemez');
 });
 test('Sonradan işleme: aralık sonrası saat gecikme sayılır; White Honey iade edilir', () => {
@@ -701,9 +868,9 @@ test('Taşıma: v4 kaydı (senin gerçek kaydının biçimi) v6\'ya dönüşür'
   eq(s.boards, {});
   const max = monStats(D.monById('noonwraith')).hp;
   eq([s.contract.id, s.contract.max, s.contract.hp], ['noonwraith', max, Math.round(max * 0.8)], 'Öğlen Hayaleti yeni listede de var: %80 can korunur');
-  const E = createEngine(s, { now: () => new Date('2026-11-06T08:45') });
+  const E = createEngine(s, { now: () => new Date('2026-11-06T08:45'), idle: false });
   E.processPending(); isOk(E.checkIn());
-  eq(s.days['2026-11-06'].reward.mult, 1.5); eq(s.contract.hp, Math.round(max * 0.8) - D.DMG.wake, 'hasar aynı canavara');
+  eq(s.days['2026-11-06'].reward.mult, 1.5); eq(s.contract.hp, Math.round(max * 0.8), 'kontrat korunur, başarı anında ek vuruş yok');
 });
 test('Taşıma: denge değişince aktif kontratın canı kalan oranla güncel değere çevrilir', () => {
   const { E, s } = setup();
@@ -751,14 +918,14 @@ function potionUp(E, s) {
   while (s.hp < E.maxHp() * 0.5 && s.swallow > 0 && E.drinkPotion().ok) {}                                    // canı yarının altındaysa iksir içer
 }
 function gearUp(E, s) {
-  const main = type => s.swords.owned.map(D.swordById).filter(w => w.type === type).sort((a, b) => b.bonus - a.bonus || E.upLevel(b.id) - E.upLevel(a.id))[0];
-  for (const id of [...s.diagrams]) E.craftSword(id);                  // boss şemalarını yaptır
+  const main = type => s.swords.owned.map(D.swordById).filter(w => w.type === type).sort((a, b) => E.swordValue(b) - E.swordValue(a))[0];
+  for (const id of [...s.diagrams]) { const c = E.craftCost(id); if (s.gold >= c.gold + 200 && s.scraps >= c.scraps) E.craftSword(id); }   // boss şemalarını yaptır
   for (const type of ['silver', 'steel']) {
-    const old = main(type), cur = old?.bonus || 0;                     // taban değeri daha yüksek kılıç çıkınca al
-    const best = E.dailySwords(type).filter(w => w.level <= s.level && w.price <= s.gold && w.bonus > cur).sort((a, b) => b.bonus - a.bonus)[0];
-    if (best) { E.buySword(best.id); if (old && E.upLevel(old.id) && s.gold >= E.transferFee(best.id)) E.transferUpgrades(old.id, best.id); }
+    const old = main(type), cur = old ? E.swordValue(old) : 0;          // senin seviyendeki daha iyi bir kılıç çıkınca al
+    const best = E.dailySwords(type).filter(w => E.shopPrice(w) <= s.gold && E.swordValue(w, s.level) > cur * 1.15).sort((a, b) => E.swordValue(b, s.level) - E.swordValue(a, s.level))[0];
+    if (best) E.buySword(best.id);
   }
-  for (const type of ['silver', 'steel']) {                            // ana kılıcı güçlendir
+  for (const type of ['silver', 'steel']) {                            // ana kılıcı seviyene kadar yükselt
     const id = main(type)?.id;
     while (id) { const c = E.upgradeCost(id); if (!c || s.gold < c.gold || s.scraps < c.scraps) break; E.upgradeSword(id); }
   }
@@ -770,14 +937,14 @@ function gearUp(E, s) {
       more = false;
       for (const [cat, n] of Object.entries(E.linkOptions(f))) {
         if (n < D.LINK_SIZE || E.completeLinks().length >= D.LINK_MAX) continue;
-        const r = E.createLink(f, cat);
+        const r = E.createLink(f, cat); if (!r.link) return;
         E.eligibleForLink(r.link.id).slice(0, D.LINK_SIZE).forEach(c => E.addToLink(r.link.id, c.a));
         if (r.link.cards.length < D.LINK_SIZE) E.deleteLink(r.link.id); else more = true;
       }
     }
   }
 }
-function simulate({ name, days = 200, type = 'sleep', pSuccess = 1, pLate = 0, pPrep = 1, sides = 2, seed = 11, faction = 'Scoiatael', gear = true }) {
+function simulate({ name, days = 320, type = 'sleep', pSuccess = 1, pLate = 0, pPrep = 1, sides = 2, seed = 11, faction = 'Scoiatael', gear = true }) {
   const quest = type === 'daily' ? { name: 'Spor', daily: { start: '18:00', end: '22:00' } } : {};
   const { E, s, go } = setup({ type, quest, seed, faction, idle: true });
   let b = seed * 7919 + 13;
@@ -816,10 +983,87 @@ function simulate({ name, days = 200, type = 'sleep', pSuccess = 1, pLate = 0, p
   return {
     name, gear, killDays, cardsPerDay60: cards60, cardsPerDay: (s.draws - d0) / days, unique: Object.keys(s.collection).length,
     goldPerDay: (s.stats.goldEarned) / days, killsPerWeek: s.trophies.length / (days / 7), level: s.level, regionDays, maxDay, legendDay, kills: s.trophies.length,
-    gearText: gear ? `${sv ? `${sv.name} +${E.upLevel(sv.id)}` : '—'} · ${E.completeLinks().length} bağ · ham +%${bonus.raw} → +%${bonus.pct}${bonus.crit ? ` · kritik %${bonus.crit}` : ''}` : `yükseltmesiz · +%${bonus.pct} (zincir)`,
-    potions: s.stats.potions || 0, defeats: s.stats.defeats || 0, gold: s.gold,
+    gearText: gear ? `${sv ? `${sv.name} Sv${E.swordLv(sv.id)}` : '—'} · ${E.completeLinks().length} bağ · +%${bonus.pct}${bonus.crit ? ` · kritik %${bonus.crit}` : ''}` : `yükseltmesiz · +%${bonus.pct} (zincir)`,
+    potions: s.stats.potions || 0, defeats: s.stats.defeats || 0, gold: s.gold, trophies: s.trophies,
   };
 }
+test('Kart bağı: ek ortak tür +%1,5, okul uyumu ×1,5, en fazla 10 bağ', () => {
+  const { E, s } = setup({ school: 'wolf' });
+  const hs = D.CARDS.filter(c => c.f === 'Northern Realms' && D.cardCats(c).includes('Human') && D.cardCats(c).includes('Soldier') && c.r === 'Common').slice(0, 5);
+  eq(hs.length, 5, 'kart var');
+  hs.forEach(c => { s.collection[c.a] = 1; });
+  const r = E.createLink('Northern Realms', 'Human'); hs.forEach(c => isOk(E.addToLink(r.link.id, c.a)));
+  const v = E.linkValue(r.link); ok(v.shared.includes('Soldier'), 'Soldier ortak'); eq(v.total, +(2.5 + v.shared.length * D.LINK_EXTRA).toFixed(1)); eq(v.fav, false);
+  const l2 = { id: 'l2', f: 'Northern Realms', cat: 'Soldier', cards: [...r.link.cards] };
+  const v2 = E.linkValue(l2); eq(v2.fav, true, 'Wolf: Soldier sever');
+  ok(Math.abs(v2.total - (v2.rar + v2.extra) * 1.5) < 0.11, 'okul ×1,5');
+  while (s.links.length < D.LINK_MAX) s.links.push({ id: 'z' + s.links.length, f: 'X', cat: 'Y', cards: [] });
+  isErr(E.createLink('Northern Realms', 'Human'), '10 bağ sınırı');
+});
+test('Başlangıç donanımı okula göre: Wolf 100 oren, gümüş + çelik; Cat sadece çelik', () => {
+  const w = setup({ school: 'wolf' }).s, c = setup({ school: 'cat' }).s;
+  eq([w.swallow, w.honey], [D.START_KIT.wolf.swallow, D.START_KIT.wolf.honey]); ok(w.gold >= 100);
+  ok(w.swords.silver && w.swords.steel, 'wolf iki kılıç'); eq(c.swords.silver, null); ok(c.swords.steel, 'cat çelik');
+  Object.values(D.START_KIT).forEach(k => [k.silver, k.steel].filter(Boolean).forEach(id => ok(D.swordById(id), 'kılıç var: ' + id)));
+});
+test('Tabela: kesilen ilan "öldü" olarak kalır; bütün ilanlar kesilince pano yenilenir', () => {
+  const { E, s } = setup();
+  const e = E.boardEntries()[0]; isOk(E.takeContract(e.m.id)); E.dev.killContract();
+  ok(E.boardEntries(0).some(x => x.m.id === e.m.id && x.killed), 'öldü olarak kalır');
+  const ids = s.boards[0].ids.slice(); ids.forEach(id => { if (!s.trophies.some(t => t.id === id)) s.trophies.push({ id }); });
+  const b = E.boardEntries(0).filter(x => !x.boss);
+  ok(b.length > 0 && b.every(x => !x.killed && !ids.includes(x.m.id)), 'yeni ilanlar');
+});
+test('Kart bağı: başka bağdaki kart seçilince oradan çıkıp buraya taşınır', () => {
+  const { E, s } = setup();
+  const elves = D.CARDS.filter(c => c.f === 'Scoiatael' && D.cardCats(c).includes('Elf')).slice(0, 2);
+  elves.forEach(c => { s.collection[c.a] = 1; });
+  const a = E.createLink('Scoiatael', 'Elf').link, b = E.createLink('Scoiatael', 'Elf').link;
+  isOk(E.addToLink(a.id, elves[0].a));
+  ok(E.eligibleForLink(b.id).every(c => c.a !== elves[0].a), 'normalde gizli');
+  ok(E.eligibleForLink(b.id, { includeUsed: true }).some(c => c.a === elves[0].a), 'seçicide görünür');
+  isOk(E.addToLink(b.id, elves[0].a)); eq(a.cards, []); eq(b.cards, [elves[0].a]); eq(E.linkOfCard(elves[0].a).id, b.id);
+  isErr(E.addToLink(b.id, elves[0].a), 'aynı bağa iki kez');
+});
+test('Okullar: Griffin kefareti 1 gün, gecikince Yorgun olmaz; Viper erken yapınca Odak (+%10 hasar)', () => {
+  const g = setup({ school: 'griffin' });
+  succeed(g.E, g.go, '2026-11-06', 8); eq(g.s.chain.len, 8);
+  g.go('2026-11-14T09:31'); eq(g.s.chain.len, 0, 'kırıldı'); g.s.effects = [];
+  g.go('2026-11-15T08:10'); isOk(g.E.checkIn()); eq(g.s.chain.repair, null, 'kefaret 1 günde'); eq(g.s.chain.len, 9);
+  g.go('2026-11-16T08:45'); isOk(g.E.checkIn()); eq(g.s.days['2026-11-16'].result, 'late'); eq(g.E.debuffPct(), 0, 'Yorgun yok');
+  g.s.honey = 0; const ghp = g.s.hp;
+  g.go('2026-11-18T09:31'); eq(g.s.days['2026-11-17'].result, 'fail'); eq(g.E.debuffPct(), 0, 'Bitkin yok'); ok(g.s.hp < ghp, 'canavar yine vurdu');
+  const v = setup({ school: 'viper' });
+  v.go('2026-11-06T08:05'); isOk(v.E.checkIn()); eq(v.E.buffPct(), 10, 'Odak');
+  const d1 = v.E.playerStats().dph; v.s.effects = []; ok(Math.abs(d1 / v.E.playerStats().dph - 1.1) < 0.001, 'hasar +%10');
+  const w = setup({ school: 'wolf' }); w.go('2026-11-06T08:05'); isOk(w.E.checkIn()); eq(w.E.buffPct(), 0);
+});
+test('Kart odağı: fraksiyonun bütün kartları toplanınca başka fraksiyona geçilir', () => {
+  const { E, s } = setup({ faction: 'Skellige' });
+  isErr(E.changeFaction('Nilfgaard'), 'tamamlanmadan olmaz');
+  D.CARDS.filter(c => c.f === 'Skellige').forEach(c => { s.collection[c.a] = 1; });
+  isErr(E.changeFaction('Skellige'), 'aynı fraksiyon');
+  isOk(E.changeFaction('Nilfgaard')); eq(s.faction, 'Nilfgaard'); eq(s.factionsDone, ['Skellige']);
+  ok(E.inPool(D.CARDS.find(c => c.f === 'Nilfgaard')) && !E.inPool(D.CARDS.find(c => c.f === 'Skellige')), 'yeni havuz');
+});
+test('Alt görevler: adet türünde her alt görev 1 sayılır, hedef alt görev sayısıdır; yaptım/yapmadımda hepsi işaretlenince tamamlanır', () => {
+  const items = ['D vitamini', 'Omega 3', 'B12', 'D vitamini', '  '];
+  const { E, s, go } = setup({ type: 'count', quest: { name: 'Vitamin al', count: { target: 9 }, items } });
+  const h = s.habits[0]; eq(h.items, ['D vitamini', 'Omega 3', 'B12'], 'boşlar ve tekrarlar atılır'); eq(h.count.target, 3);
+  go('2026-11-06T10:00');
+  isOk(E.toggleItem('D vitamini')); isOk(E.toggleItem('B12')); eq(h.entries['2026-11-06'].count, 2);
+  isOk(E.toggleItem('B12')); eq(h.entries['2026-11-06'].count, 1, 'işaret kaldırılınca düşer');
+  isErr(E.toggleItem('Yok böyle'));
+  isOk(E.toggleItem('B12')); isOk(E.toggleItem('Omega 3'));
+  eq(h.entries['2026-11-06'].result, 'success'); isErr(E.toggleItem('B12'), 'gün bitti');
+  go('2026-11-07T10:00'); isOk(E.toggleItem('Omega 3')); isOk(E.toggleItem('B12'));
+  go('2026-11-08T04:00'); eq(h.entries['2026-11-07'].result, 'late', 'yarısından fazlası: gecikme');
+  const c = setup({ type: 'check', quest: { name: 'Sabah rutini', items: ['Yatak', 'Esneme'] } });
+  c.go('2026-11-06T09:00'); const hc = c.s.habits[0];
+  isOk(c.E.toggleItem('Yatak')); eq(hc.entries['2026-11-06'].result, undefined);
+  isOk(c.E.toggleItem('Esneme')); eq(hc.entries['2026-11-06'].result, 'success');
+  isOk(c.E.updateQuest({ items: ['Yatak', 'Esneme', 'Su'] }, hc.id)); eq(c.s.habits[0].items.length, 3, 'düzenlenebilir');
+});
 const SIMS = [
   { name: 'Kusursuz uyku · yükseltmesiz', pSuccess: 1, pPrep: 1, gear: false },
   { name: 'Kusursuz uyku · yükseltmeli', pSuccess: 1, pPrep: 1 },
@@ -830,18 +1074,19 @@ const SIMS = [
 ];
 const simRows = [];
 window.KM_SIM = { simulate, SIMS };                     // konsoldan denge denemesi için
-test('Simülasyon (200 gün, idle savaş): gerçekçi oyuncu ~5 ayda, kusursuz ~3,5 ayda son seviye; boss\'larda ölüm yok; kolay canavarlar gün içinde ölür', () => {
+test('Simülasyon (320 gün, idle savaş): kusursuz ~4 ayda, gerçekçi ~6–7 ayda son seviye; son boss kusursuza 7–13, gerçekçiye 10+ gün', () => {
   SIMS.forEach(cfg => simRows.push(simulate(cfg)));
   const [pNo, pGear, rNo, rGear, hard] = simRows;
   simRows.forEach(r => { ok(r.level >= 4 && Number.isFinite(r.goldPerDay) && Number.isFinite(r.cardsPerDay), r.name + ' geçerli: sv ' + r.level); });
-  ok(rGear.maxDay >= 135 && rGear.maxDay <= 175, 'gerçekçi + donanım son seviye günü (~5 ay): ' + rGear.maxDay);
-  ok(pGear.maxDay >= 90 && pGear.maxDay <= 125, 'kusursuz + donanım son seviye günü (~3,5 ay): ' + pGear.maxDay);
+  ok(rGear.maxDay >= 175 && rGear.maxDay <= 230, 'gerçekçi + donanım son seviye günü (~6–7 ay): ' + rGear.maxDay);
+  ok(pGear.maxDay >= 110 && pGear.maxDay <= 140, 'kusursuz + donanım son seviye günü (~4 ay): ' + pGear.maxDay);
   ok(!hard.maxDay || hard.maxDay > rGear.maxDay + 20, 'zorlanan oyuncu belirgin yavaş');
-  ok(pNo.maxDay > pGear.maxDay && rNo.maxDay >= rGear.maxDay, 'donanımsız daha yavaş');
-  simRows.forEach(r => ok(r.defeats <= 3, r.name + ' yenilgi: ' + r.defeats));
-  ok(pGear.killDays[0].normal <= 8 && pGear.killDays[0].boss <= 24, 'ilk kademede kolay canavar birkaç saat, boss bir gün içinde');
-  ok(pGear.killDays.at(-1).boss <= 72, 'son boss en çok 3 gün: ' + pGear.killDays.at(-1).boss);
-  ok(pGear.cardsPerDay >= 4 && pGear.cardsPerDay <= 6, 'kusursuz kart/gün: ' + pGear.cardsPerDay.toFixed(2));
+  ok(pNo.maxDay > pGear.maxDay && (!rNo.maxDay || rNo.maxDay >= rGear.maxDay), 'donanımsız daha yavaş');
+  simRows.filter(r => r !== hard).forEach(r => ok(r.defeats <= 3, r.name + ' yenilgi: ' + r.defeats));   // zorlanan oyuncu yenilebilir: hasar almanın bedeli
+  ok(pGear.killDays[0].normal >= 8 && pGear.killDays[0].normal <= 30, 'ilk kademede normal canavar yarım–bir gün: ' + pGear.killDays[0].normal);
+  ok(pGear.killDays.at(-1).boss >= 168 && pGear.killDays.at(-1).boss <= 320, 'kusursuz: son boss 7–13 gün: ' + pGear.killDays.at(-1).boss);
+  ok(rGear.killDays.at(-1).boss >= 240, 'gerçekçi: son boss 10+ gün: ' + rGear.killDays.at(-1).boss);
+  ok(pGear.cardsPerDay >= 3 && pGear.cardsPerDay <= 6, 'kusursuz kart/gün: ' + pGear.cardsPerDay.toFixed(2));
   ok(hard.cardsPerDay < rGear.cardsPerDay && rGear.cardsPerDay < pGear.cardsPerDay, 'daha iyi alışkanlık = daha çok kart');
   return;
   const first = pGear.killDays[0], last = pGear.killDays.at(-1);

@@ -6,13 +6,14 @@ Sadece Python standart kütüphanesi kullanır (kurulum gerekmez).
   py server.py --port 9000
   py server.py --open "?slot=test"   -> test kaydıyla aç (Test.bat bunu yapar)
 
-Veriler bu klasördeki kaermorhen.db (SQLite) dosyasında durur.
+Veriler bu klasördeki hofw.db (SQLite) dosyasında durur (hofw = Habits of Witchers).
+Eski adlı dosyalar (kaermorhen*.db, kaermorhen-ayar.json) ilk açılışta kendiliğinden yeni adlara taşınır.
 Her gün ilk açılışta backups/ klasörüne bir yedek alınır (son 14 gün saklanır).
 
 Telefondan erişim: uygulamada Ayarlar > Telefondan erişim > "Aç" ile ev ağındaki cihazlara açılır.
 PIN isteğe bağlıdır. Kapalıyken diğer cihazlardan gelen istekler reddedilir (sunucu yine ağı dinler,
 böylece aç/kapat için yeniden başlatmak gerekmez).
-Ayar dosyası: kaermorhen-ayar.json (PIN varsa özeti saklanır, kendisi değil).
+Ayar dosyası: hofw-ayar.json (PIN varsa özeti saklanır, kendisi değil).
 """
 import datetime
 import hmac
@@ -32,10 +33,35 @@ import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import imgcache
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 BACKUP_DIR = os.path.join(ROOT, "backups")
 DB_LOCK = threading.RLock()
-CONFIG_PATH = os.path.join(ROOT, "kaermorhen-ayar.json")
+PREFIX = "hofw"                    # dosya adlarının ön eki (Habits of Witchers)
+OLD_PREFIX = "kaermorhen"          # eski ad: ilk açılışta yeni ada taşınır
+
+
+def renamed(path):
+    """Yeni adlı dosya yoksa ve eski adlısı varsa eskisini yeni ada taşır (-wal/-shm/-journal dahil).
+    Taşınamazsa (ör. başka bir sunucu dosyayı açık tutuyorsa) eski adı kullanmaya devam eder."""
+    folder, name = os.path.split(path)
+    if not name.startswith(PREFIX) or os.path.exists(path):
+        return path
+    old = os.path.join(folder, OLD_PREFIX + name[len(PREFIX):])
+    if not os.path.exists(old):
+        return path
+    try:
+        os.replace(old, path)
+        for ext in ("-wal", "-shm", "-journal"):
+            if os.path.exists(old + ext):
+                os.replace(old + ext, path + ext)
+        return path
+    except OSError:
+        return old
+
+
+CONFIG_PATH = renamed(os.path.join(ROOT, f"{PREFIX}-ayar.json"))
 DEV = "--dev" in sys.argv          # test için: X-KM-Remote başlığı uzak cihaz gibi davranır
 LISTENING = {"lan": False, "port": 8642}
 LOGIN_FAILS = {}                   # ip -> (deneme sayısı, kilit bitişi)
@@ -113,7 +139,7 @@ CREATE TABLE IF NOT EXISTS habit_days(
 
 def db_path(slot):
     slot = re.sub(r"[^a-z0-9_-]", "", (slot or "main").lower())[:20] or "main"
-    return os.path.join(ROOT, "kaermorhen.db" if slot == "main" else f"kaermorhen-{slot}.db")
+    return renamed(os.path.join(ROOT, f"{PREFIX}.db" if slot == "main" else f"{PREFIX}-{slot}.db"))
 
 
 def connect(slot):
@@ -241,11 +267,12 @@ def daily_backup():
     if not os.path.exists(src):
         return
     os.makedirs(BACKUP_DIR, exist_ok=True)
-    target = os.path.join(BACKUP_DIR, f"kaermorhen-{datetime.date.today().isoformat()}.db")
+    target = os.path.join(BACKUP_DIR, f"{PREFIX}-{datetime.date.today().isoformat()}.db")
     if not os.path.exists(target):
         with closing(sqlite3.connect(src)) as s, closing(sqlite3.connect(target)) as t:
             s.backup(t)
-    backups = sorted(f for f in os.listdir(BACKUP_DIR) if f.endswith(".db"))
+    # en yeniler kalsın: ada göre değil tarihe göre sırala (eski ve yeni ön ekli yedekler karışık olabilir)
+    backups = sorted((f for f in os.listdir(BACKUP_DIR) if f.endswith(".db")), key=lambda f: os.path.getmtime(os.path.join(BACKUP_DIR, f)))
     for old in backups[:-14]:
         os.remove(os.path.join(BACKUP_DIR, old))
 
@@ -260,8 +287,24 @@ class Handler(SimpleHTTPRequestHandler):
         super().log_message(fmt, *args)
 
     def end_headers(self):
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", getattr(self, "_cache_control", None) or "no-store")
         super().end_headers()
+
+    def _image(self):
+        """/img?u=<adres>: görseli kendi önbelleğimizden (hofw-gorsel.db) verir; yoksa bir kez indirip saklar."""
+        url = (parse_qs(urlparse(self.path).query).get("u") or [""])[0]
+        if not imgcache.allowed(url):
+            return self._json(400, {"error": "image host not allowed"})
+        try:
+            ctype, data = imgcache.get(url)
+        except Exception:  # noqa: BLE001  internet yoksa ya da site cevap vermezse
+            return self._json(502, {"error": "image unavailable"})
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self._cache_control = "public, max-age=31536000, immutable"
+        self.end_headers()
+        self.wfile.write(data)
 
     def _json(self, code, obj):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -323,8 +366,10 @@ class Handler(SimpleHTTPRequestHandler):
             cfg = load_config()
             return self._json(200, {"local": self._is_local(), "lan": bool(cfg.get("lan")), "pin": bool(cfg.get("pin_hash")), "listening": LISTENING["lan"],
                                     "urls": [f"http://{ip}:{LISTENING['port']}/" for ip in lan_ips()] if self._is_local() else []})
-        if path.startswith("/api/") and not self._guard():
+        if (path.startswith("/api/") or path == "/img") and not self._guard():
             return
+        if path == "/img":
+            return self._image()
         if path == "/api/state":
             slot = self._slot()
             return self._json(200, {"state": load_state(slot), "rev": get_rev(slot)})
@@ -465,7 +510,7 @@ def main():
             print(f"   http://{ip}:{port}/")
     else:
         print("Telefondan erişim kapalı (Ayarlar > Telefondan erişim).")
-    print("Bu pencereyi kapatırsan uygulama durur. Veriler: kaermorhen.db")
+    print("Bu pencereyi kapatırsan uygulama durur. Veriler: hofw.db")
     if open_browser:
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()
     try:

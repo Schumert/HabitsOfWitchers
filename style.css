@@ -276,6 +276,7 @@ details.box[open] > summary { margin-bottom: 8px; }
 label.radio { display: inline-flex; gap: 6px; align-items: center; color: var(--text); margin: 6px 14px 6px 0; }
 .qform [hidden] { display: none; }
 .monster-art img, .simg img, .tcell img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
+.simg img.top { object-position: center 12%; }
 .monster-art { overflow: hidden; }
 .tcell.hunter, .tcell.monster-cell { overflow: hidden; padding: 0; }
 .trophy.unseen img { filter: grayscale(1) brightness(.3); }
@@ -322,6 +323,11 @@ label.radio { display: inline-flex; gap: 6px; align-items: center; color: var(--
 
 /* ---- v5: bölgeler, kontrat tabelası, okul ---- */
 .region-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
+.region-strip { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 18px; align-items: center; }
+.region-strip .rs-info { margin: 0; font-size: .9rem; }
+@media (max-width: 820px) { .region-strip { grid-template-columns: 1fr; } }
+#regionPanel { padding-top: 12px; padding-bottom: 12px; }
+.hc-done { color: #a9d38a; font-size: .92rem; margin: 4px 0; }
 .badge.red { color: #f2c9c9; border-color: #b44; background: #3a1414; }
 .board { display: flex; flex-direction: column; gap: 8px; }
 .contract { display: flex; gap: 10px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); }
@@ -359,6 +365,17 @@ label.radio { display: inline-flex; gap: 6px; align-items: center; color: var(--
 .sword-body .row .btn + .btn, .sword-body .row .badge + .btn { margin-left: 4px; }
 
 .sword-body .bane { color: #e8a87c; }
+.sword-body .unique { color: #e9d9a8; display: block; margin-top: 2px; }
+.sword-body .unique b { color: var(--gold2); }
+.sword-body .unique.aero { color: #bfe6ff; }
+.sword-body .unique.aero b { color: #ffe7a6; text-shadow: 0 0 8px #7fd0ff; }
+.aero-charge { margin: 4px 0 8px; font-size: .85rem; color: #bfe6ff; }
+.aero-charge .bar { height: 6px; background: #1a2430; border-radius: 3px; overflow: hidden; margin-top: 3px; }
+.aero-charge .fill { height: 100%; background: linear-gradient(90deg, #4aa8e0, #ffe7a6); transition: width .4s; }
+.aero-charge.full span { color: #ffe7a6; text-shadow: 0 0 8px #7fd0ff; }
+.aero-charge.full .fill { box-shadow: 0 0 10px #7fd0ff; animation: aeroPulse 1.6s ease-in-out infinite; }
+.medallion.aero-full { border-color: #ffe7a6; box-shadow: 0 0 22px #7fd0ffcc, 0 0 8px #ffe7a6; animation: aeroPulse 2s ease-in-out infinite; }
+@keyframes aeroPulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
 
 /* ---- v9: başarımlar, grafikler, efektler, telefon ---- */
 .ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
@@ -459,19 +476,57 @@ img.broken { opacity: 0; }
   box-shadow: 0 6px 12px #000a, inset 0 0 18px #8a6d3f55; transition: transform .15s, box-shadow .15s; border-radius: 2px; }
 .note:hover { transform: rotate(0deg) translateY(-3px); box-shadow: 0 10px 18px #000c, inset 0 0 18px #8a6d3f55; }
 .note.sel { transform: rotate(0deg) scale(1.05); box-shadow: 0 0 0 3px #e8cf8f, 0 0 22px #e8cf8f99, 0 10px 18px #000c; }
-.note .note-img { height: 78px; overflow: hidden; margin-bottom: 6px; border: 1px solid #8a6d3f; }
-.note .note-img img { width: 100%; height: 100%; object-fit: cover; filter: sepia(.45) contrast(1.05); display: block; }
+.note .note-img { height: 150px; overflow: hidden; margin-bottom: 6px; border: 1px solid #8a6d3f; }
+.note .note-img img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; filter: sepia(.45) contrast(1.05); display: block; }
 .note b { display: block; font-size: .9rem; line-height: 1.15; }
 .note small { color: #5a4630; font-size: .78rem; }
 .note.boss { width: 180px; background: linear-gradient(135deg, #f3e6c4, #d6bd88 70%, #b99a5f); }
 .note .seal { position: absolute; bottom: -12px; left: 50%; width: 26px; height: 26px; margin-left: -13px; border-radius: 50%;
   background: radial-gradient(circle at 40% 35%, #d0453a, #7d1710 70%); box-shadow: 0 2px 4px #000a; }
 .note .pinned { position: absolute; top: -9px; right: -6px; background: #6b1f14; color: #ffe7a6; font-size: .7rem; padding: 2px 6px; border-radius: 3px; font-family: "Cinzel"; }
-.note.done { opacity: .45; }
+.note.done { cursor: default; }
+.note.done .note-img img { filter: grayscale(1) brightness(.55) sepia(.3); }
+.note.done b, .note.done small { opacity: .55; text-decoration: line-through; text-decoration-color: #7d1710aa; }
+.note .slain { position: absolute; top: 34px; left: 50%; transform: translateX(-50%) rotate(-14deg); pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; color: #8b1a10; font-family: "Cinzel"; font-weight: 700; letter-spacing: 2px;
+  border: 3px double #8b1a10cc; border-radius: 6px; padding: 2px 10px 4px; background: #efe3c6cc; box-shadow: 0 0 0 2px #efe3c655; }
+.note .slain .skull { font-size: 2.4rem; line-height: 1; filter: drop-shadow(0 2px 2px #0008); }
+.note .slain small { font-size: .7rem; color: #8b1a10; text-decoration: none; opacity: 1; }
+/* kartın türleri: üzerine gelince kartın üstünde */
+.card .ccats { position: absolute; left: 0; right: 0; top: 0; padding: 6px 6px 16px; font-size: .66rem; line-height: 1.25; text-align: center;
+  color: #f1e3b8; background: linear-gradient(#000e 55%, transparent); opacity: 0; transform: translateY(-6px); transition: opacity .15s, transform .15s; pointer-events: none; }
+.card .ccats b { color: var(--gold2); font-weight: 700; }
+.card:hover .ccats, .pick:hover .ccats, .link-slot:hover .ccats { opacity: 1; transform: none; }
+/* bağ kartı seçici */
+.picker-sec { margin: 14px 0 6px; font-family: "Cinzel"; color: var(--gold2); font-size: .9rem; }
+.pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 14px; }
+.pick { position: relative; cursor: pointer; }
+.pick .card { transition: transform .15s, box-shadow .15s; }
+.pick:hover .card { transform: translateY(-4px) scale(1.03); }
+.pick.keep .card { box-shadow: 0 0 0 2px #7fb26a, 0 0 14px #7fb26a66; }
+.pick.breaks .card { opacity: .85; }
+.pick .pick-info { display: flex; justify-content: center; gap: 6px; font-size: .76rem; color: var(--gold2); margin-top: 4px; }
+.pick .pick-info .bad { color: #e2876f; }
+.pick .pick-info .good { color: #9fd08a; }
+/* başka bağdaki kart: zincirle sarılı */
+.pick.linked .card { border-style: dashed; filter: saturate(.7); }
+.pick.linked::before { content: ""; position: absolute; inset: -5px -5px 18px; border-radius: 11px; pointer-events: none; z-index: 3;
+  background: repeating-linear-gradient(90deg, #c9b07a 0 9px, transparent 9px 13px) top / 100% 3px no-repeat,
+              repeating-linear-gradient(90deg, #c9b07a 0 9px, transparent 9px 13px) bottom / 100% 3px no-repeat,
+              repeating-linear-gradient(180deg, #c9b07a 0 9px, transparent 9px 13px) left / 3px 100% no-repeat,
+              repeating-linear-gradient(180deg, #c9b07a 0 9px, transparent 9px 13px) right / 3px 100% no-repeat;
+  filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 6px #e0b44c55); animation: chainGlow 2.4s ease-in-out infinite; }
+.pick.linked .lock { position: absolute; top: 46%; left: 50%; transform: translate(-50%, -50%); z-index: 4; pointer-events: none;
+  background: #1a1510ee; border: 1px solid #c9b07a; border-radius: 14px; padding: 3px 9px; font-size: .7rem; color: #f1e3b8; white-space: nowrap; box-shadow: 0 2px 8px #000a; }
+.pick.linked:hover .lock { opacity: 0; }
+@keyframes chainGlow { 50% { filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 10px #e0b44caa); } }
 .cdetail { background: linear-gradient(180deg, #151413, #0d0c0b); color: #d8d2c4; padding: 18px 18px 20px; display: flex; flex-direction: column; gap: 8px; }
 .cdetail h3 { text-align: center; color: #f1e9d6; margin: 0 0 4px; font-family: "Cinzel"; }
-.cdetail .cd-art { height: 150px; overflow: hidden; border: 1px solid #3a3226; }
-.cdetail .cd-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cdetail .cd-art { height: 240px; overflow: hidden; border: 1px solid #3a3226; }
+.cdetail .cd-art img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; display: block; }
+.link-slot .lc { display: block; text-align: center; font-size: .75rem; color: var(--gold2); margin-top: 2px; }
+.link-sum { font-size: .85rem; margin: 4px 0 0; }
+.pick-info { display: block; text-align: center; font-size: .75rem; color: var(--gold2); }
 .cdetail p { margin: 0; line-height: 1.5; font-size: .93rem; }
 .cdetail .cd-stats { color: var(--gold2); font-size: .88rem; }
 @media (max-width: 820px) {
@@ -497,7 +552,9 @@ img.broken { opacity: 0; }
 .bar.thin { height: 16px; margin: 6px 0; }
 .bar.thin span { font-size: .75rem; line-height: 16px; }
 .hc-body { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
-.hc-body > small { flex-basis: 100%; }
+.hc-body > small, .hc-body > .bar, .hc-body > .hc-done { flex-basis: 100%; }
+.hc-body > .bar.count { height: 20px; }
+.hc-body > .bar.count span { font-size: .85rem; line-height: 19px; font-weight: 600; }
 .hc-state { flex: 1; min-width: 180px; font-size: .9rem; }
 .hc-last { font-size: .82rem; margin: 2px 0 4px; color: var(--muted, #9a9384); }
 .hc-last.success { color: #8fc27f; } .hc-last.fail { color: #d98b7f; } .hc-last.late { color: #d9b56f; }
@@ -548,3 +605,22 @@ img.broken { opacity: 0; }
 .worldmap .reg-label .lvl { fill: #5d4630; font-size: 12px; paint-order: stroke; stroke: #ecdcb0; stroke-width: 3px; }
 .worldmap .reg-label.locked .lbl { fill: #6d5d45; }
 .modal-box.map { max-width: 960px; }
+
+/* demircinin nadir kılıçları */
+.sword.rare { position: relative; border-color: #e0b44c; box-shadow: 0 0 0 1px #e0b44c88, 0 0 18px #e0b44c55; animation: rareGlow 2.6s ease-in-out infinite; }
+.sword.rare.r2 { border-color: #ff9a3c; box-shadow: 0 0 0 1px #ff9a3caa, 0 0 26px #ff7a1c88; animation-duration: 1.8s; }
+.sword.rare .sword-img img { filter: drop-shadow(0 0 6px #e0b44caa); }
+.rare-tag { display: inline-block; font-size: .7rem; font-family: "Cinzel"; letter-spacing: 1px; color: #1a1408; background: linear-gradient(90deg, #e0b44c, #ffe7a6, #e0b44c);
+  background-size: 200% 100%; animation: rareShine 2.2s linear infinite; padding: 1px 7px; border-radius: 3px; margin-bottom: 3px; }
+.rare-tag.r2 { background: linear-gradient(90deg, #ff7a1c, #ffd27a, #ff7a1c); background-size: 200% 100%; }
+@keyframes rareGlow { 50% { box-shadow: 0 0 0 1px #e0b44ccc, 0 0 30px #e0b44c99; } }
+@keyframes rareShine { to { background-position: -200% 0; } }
+
+.odds { font-size: .88rem; margin: 4px 0 10px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+
+/* alt görevler */
+.subtasks { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
+.subtasks .sub { font: inherit; font-size: .88rem; padding: 4px 10px; border-radius: 14px; border: 1px solid #4a4130; background: #1d1a14; color: var(--text, #ddd); cursor: pointer; }
+.subtasks button.sub:hover { border-color: var(--gold); }
+.subtasks .sub.done { border-color: #5e7f45; background: #1f2a17; color: #b9dca0; text-decoration: line-through; text-decoration-color: #b9dca088; }
+.qform textarea { width: 100%; max-width: 420px; font: inherit; background: #15140f; color: inherit; border: 1px solid #3a3226; border-radius: 6px; padding: 6px 8px; }

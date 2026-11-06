@@ -82,31 +82,70 @@ const SWORD_TIERS = root.KM_SWORD_TIERS || {};
 const SWORD_TIER_EN = { 1: 'Common', 2: 'Masterwork', 3: 'Magic', 4: 'Legendary', 5: 'School set', 6: 'Ancient' };
 Object.entries(SWORD_TIERS).forEach(([k, t]) => bi(t, { name: SWORD_TIER_EN[k] || t.name }));
 const swordById = id => SWORDS.find(w => w.id === id) || null;
+/* kılıçlar (Witcher 3'teki gibi): gücü kılıcın SEVİYESİNE ve kademesine bağlı. Kılıç, demircide senin seviyende çıkar;
+ * elindeki kılıcın seviyesini oren + kırıntıyla yükseltirsin (en fazla kendi seviyene kadar). Seviye şartı yok.
+ * Gümüş: saatlik hasar = taban(seviye) × kademe çarpanı. Çelik: kritik % = taban(seviye) + kademe eki. */
+const swordBase = L => 6 * Math.pow(130 / 6, (Math.max(1, L) - 1) / 29);      // gümüş: 1. seviye 6 → 30. seviye 130
+const critBase = L => 3 + 11 * (Math.max(1, L) - 1) / 29;                     // çelik: %3 → %14
+const SILVER_MULT = { 1: 0.75, 2: 0.88, 3: 1, 4: 1.15, 6: 1.54 };             // Sıradan, Usta işi, Büyülü, Efsanevi, Kadim (Aerondight 30. seviyede 200)
+const STEEL_ADD = { 1: -1, 2: 0, 3: 1, 4: 2, 6: 3 };
+const swordMult = w => (w.set ? 1.15 + 0.04 * (w.v || 0) : SILVER_MULT[w.tier] ?? 1);   // okul seti: aşamaya göre ×1.15 → ×1.35
+const steelAdd = w => (w.set ? 2 + Math.floor((w.v || 0) / 2) : STEEL_ADD[w.tier] ?? 0);
+const swordDmgAt = (w, L) => Math.round(swordBase(L) * swordMult(w) * 10) / 10;
+const swordCritAt = (w, L) => Math.max(1, Math.round(critBase(L) + steelAdd(w)));
+const swordPrice = (w, L) => (w.type === 'silver'
+  ? Math.max(40, Math.round(swordDmgAt(w, L) * 30 / 5) * 5)
+  : Math.max(40, Math.round((swordCritAt(w, L) ** 2 * 6 + L * 20) * (1 + ((w.set ? 4 : w.tier) - 1) * 0.15) / 5) * 5));
+/* demircide kademe olasılıkları (%): 1. seviyeden 30. seviyeye doğrusal değişir */
+const RARITY_ODDS = { 1: [60, 10], 2: [25, 20], 3: [13, 40], 4: [2, 30] };
+const rarityOdds = L => { const t = (Math.min(30, Math.max(1, L)) - 1) / 29; return Object.fromEntries(Object.entries(RARITY_ODDS).map(([k, [a, b]]) => [k, Math.round((a + (b - a) * t) * 10) / 10])); };
+const AERONDIGHT = { chance: 0.01, minLevel: 25 };                          // çok nadir: 25. seviyeden sonra günlük %1
+/* kılıç seviyesi yükseltme: bedeli yeni seviyedeki fiyatının %35'i kadar oren + kırıntı */
+const SWORD_UP = { goldShare: 0.35, scraps: L => 4 + Math.floor(L / 2) };
+const SCRAP_PER_KILL = 1;                                                    // kazanılan her dövüş 1 kırıntı
 
 const SCHOOLS = {
-  wolf:    { name: 'Wolf School',    art: 1476, desc: 'Dengeli yol. Zincirindeki her halka günlük ödülü %5 artırır (en çok +%50).' },
-  cat:     { name: 'Cat School',     art: 2342, desc: 'Kumarbaz. Canavar ödülleri ×1.3, ama aldığın hasar ×1.5.' },
-  bear:    { name: 'Bear School',    art: 2352, desc: 'Dayanıklı. 140 can, aldığın hasar ×0.6, ama ödüller ×0.85.' },
-  griffin: { name: 'Griffin School', art: 2362, desc: 'Disiplinli. Aralıkta yatış (meditasyon) sabah ödülünü ×1.5 yerine ×1.8 yapar.' },
-  viper:   { name: 'Viper School',   art: 2312, desc: 'Dakik. Aralığın ilk 10 dakikasında (ya da daha erken) yaparsan ödül ×1.4.' },
+  wolf:    { name: 'Wolf School',    art: 1476, desc: 'Dengeli yol. Zincirindeki her halka o alışkanlığın ödülünü %5 artırır (en çok +%50). Sevdiği kart türleri: Witcher, Soldier, Beast.' },
+  cat:     { name: 'Cat School',     art: 2342, desc: 'Kumarbaz. Canavar ödülleri ×1.3, ama aldığın hasar ×1.5. Sevdiği kart türleri: Agent, Bandit, Crime.' },
+  bear:    { name: 'Bear School',    art: 2352, desc: 'Dayanıklı. Can ×1.4, aldığın hasar ×0.6, avda saatte %0,5 iyileşirsin, yenilince iki kat hızlı toparlanırsın. Sevdiği kart türleri: Warrior, Dwarf, Ogroid.' },
+  griffin: { name: 'Griffin School', art: 2362, desc: 'Disiplinli. Kırılan zincir için kefaret 2 yerine 1 gün; gecikince Yorgun, kaçırınca Bitkin olmazsın. Sevdiği kart türleri: Mage, Spell, Knight.' },
+  viper:   { name: 'Viper School',   art: 2312, desc: 'Dakik. Görevi erken yaparsan (saatli türlerde aralığın ilk 10 dakikası, diğerlerinde öğleden önce) ödül ×1.4 ve 24 saat Odak: hasar +%10. Sevdiği kart türleri: Elf, Alchemy, Aristocrat.' },
+  manticore: { name: 'Manticore School', img: 'img/manticore.webp', desc: 'Simyacı. İksirleri yarı fiyatına alırsın (bombalar hariç); Dancing Star %30 daha sert vurur. Sevdiği kart türleri: Cursed, Relict, Vampire.' },
 };
+/* okulun görseli: Gwent kart resmi ya da yerel görsel */
+const schoolImg = (id, q = 'medium') => { const x = SCHOOLS[id] || SCHOOLS.wolf; return x.img || ART(x.art, q); };
 const SCHOOL_EN = {
-  wolf: 'Balanced. Every link in your chain raises daily rewards by 5% (up to +50%).',
-  cat: 'Gambler. Monster rewards ×1.3, but damage taken ×1.5.',
-  bear: 'Tough. 140 HP, damage taken ×0.6, but rewards ×0.85.',
-  griffin: 'Disciplined. Going to bed in your window (meditation) makes the morning reward ×1.8 instead of ×1.5.',
-  viper: 'Punctual. Do it in the first 10 minutes of the window (or earlier) for ×1.4 rewards.',
+  wolf: "Balanced. Every link in a chain raises that habit's reward by 5% (up to +50%). Favoured card categories: Witcher, Soldier, Beast.",
+  cat: 'Gambler. Monster rewards ×1.3, but damage taken ×1.5. Favoured card categories: Agent, Bandit, Crime.',
+  bear: 'Tough. HP ×1.4, damage taken ×0.6, heals 0.5%/h while hunting and recovers twice as fast after a defeat. Favoured card categories: Warrior, Dwarf, Ogroid.',
+  griffin: "Disciplined. Atonement for a broken chain takes 1 day instead of 2; being late doesn't make you Tired and missing a day doesn't make you Exhausted. Favoured card categories: Mage, Spell, Knight.",
+  viper: 'Punctual. Do a quest early (first 10 minutes of the window for timed types, before noon for the others) for ×1.4 rewards and 24 hours of Focus: +10% damage. Favoured card categories: Elf, Alchemy, Aristocrat.',
+  manticore: 'Alchemist. Potions cost half (bombs excluded); Dancing Star hits 30% harder. Favoured card categories: Cursed, Relict, Vampire.',
 };
 Object.entries(SCHOOL_EN).forEach(([k, d]) => bi(SCHOOLS[k], { desc: d }));
-// zincir: mult = günlük ödül çarpanı, dmg = hasar bonusu (%)
+/* okula göre başlangıç donanımı. Wolf referans: 100 oren, 3 Swallow, 1 White Honey, gümüş + çelik kılıç.
+ * Cat: daha çok oren ve kırıntı ama az güvence, sadece çelik (kritik). Bear: az oren, çok White Honey (zaten hızlı iyileşir).
+ * Griffin: kırıntı (erken güçlendirme) ve White Honey, sadece gümüş. Viper: oren ve vahşi bir gümüş, çelik; güvence az.
+ * Manticore: az oren, bunun yerine Thunderbolt ve Dancing Star. */
+const START_KIT = {
+  wolf:    { gold: 100, swallow: 3, honey: 1, scraps: 0,  silver: 'silver-gven-nel',                  steel: 'steel-witch-hunter-s-sword' },
+  cat:     { gold: 180, swallow: 2, honey: 0, scraps: 20, silver: null,                               steel: 'steel-vrihedd-brigade-sword' },
+  bear:    { gold: 70,  swallow: 2, honey: 2, scraps: 0,  silver: 'silver-eirlithrad',                steel: 'steel-skellige-longsword' },
+  griffin: { gold: 100, swallow: 2, honey: 2, scraps: 40, silver: 'silver-mastercrafted-silver-sword', steel: null },
+  viper:   { gold: 120, swallow: 3, honey: 0, scraps: 15, silver: 'silver-disglair',                  steel: 'steel-scoia-tael-sword' },
+  manticore: { gold: 80, swallow: 2, honey: 0, scraps: 0, thunder: 1, dancing: 3, silver: 'silver-the-striga',      steel: 'steel-novigrad-longsword' },
+};
+/* zincir: mult = alışkanlık ödülü (TP + oren) çarpanı, dmg = canavara verdiğin hasar (%).
+ * Zincir hasarı ana güç kaynağıdır; kart bağları ve avcı bonusuyla toplanır (tavan ya da azaltım yok). */
 const TIERS = [
-  { name: 'Demir',   at: 0,  mult: 1,    dmg: 0,  color: '#7d838b', min: null },
-  { name: 'Çelik',   at: 7,  mult: 1.1,  dmg: 5,  color: '#a9b8c8', min: 'Rare' },
-  { name: 'Gümüş',   at: 14, mult: 1.2,  dmg: 10, color: '#eef3f8', min: 'Epic' },
-  { name: 'Altın',   at: 30, mult: 1.35, dmg: 15, color: '#e0b44c', min: 'Legendary' },
-  { name: 'Göktaşı', at: 60, mult: 1.5,  dmg: 20, color: '#d0673a', min: 'Legendary' },
+  { name: 'Demir',   at: 0,  mult: 1,   dmg: 0,   color: '#7d838b', min: null },
+  { name: 'Çelik',   at: 7,  mult: 1.2, dmg: 10,  color: '#a9b8c8', min: 'Rare' },
+  { name: 'Gümüş',   at: 14, mult: 1.3, dmg: 20,  color: '#eef3f8', min: 'Epic' },
+  { name: 'Altın',   at: 30, mult: 1.5, dmg: 30,  color: '#e0b44c', min: 'Legendary' },
+  { name: 'Mithril', at: 40, mult: 1.7, dmg: 50,  color: '#8fd3e6', min: 'Legendary' },
+  { name: 'Göktaşı', at: 60, mult: 2,   dmg: 100, color: '#d0673a', min: 'Legendary' },
 ];
-['Iron', 'Steel', 'Silver', 'Gold', 'Meteorite'].forEach((n, i) => bi(TIERS[i], { name: n }));
+['Iron', 'Steel', 'Silver', 'Gold', 'Mithril', 'Meteorite'].forEach((n, i) => bi(TIERS[i], { name: n }));
 const tierOf = len => { let t = 0; TIERS.forEach((x, i) => { if (len >= x.at) t = i; }); return t; };
 const REPAIR_NEED = 2;
 const QUEST_MIN = 14, QUEST_MAX = 60;
@@ -120,69 +159,167 @@ const DMG = { wake: 20, prep: 10, daily: 30, side: 3 };          // başarı ba�
 const DAY_XP = { wake: 5, prep: 2, daily: 6, late: 1 };           // günlük TP (asıl TP canavarlardan gelir)
 const DAY_GOLD = { wake: 5, prep: 2, daily: 6 };                  // günlük oren (asıl oren canavar ödülünden gelir)
 const CARDS_PER = { first: 2, next: 1, prepBonus: 1, levelUp: 3, kill: 2, boss: 5 };   // günün ilk başarısı 2, sonrakiler 1 kart
-/* Bölge başına EN YÜKSEK değerler. Her canavar bunların str (0.55–1) katını alır: canı az olanın ödülü de azdır.
- * Can, öldürme süresi hedefinden hesaplandı (kusursuz + yükseltmeli oyuncu): White Orchard 1–2 gün,
- * Toussaint'te en güçlüsü en fazla 5 gün, arası kademeli. Yükseltmesiz oyuncu son bölgede ~%40 daha yavaş. */
+/* Bölge başına EN YÜKSEK değerler: her canavar bunların str (0.55–1) katını alır; canı az olanın ödülü de azdır. */
 /* ---------- idle savaş ----------
- * Av sürekli akar (uygulama kapalıyken de; açılınca geçen süre STEP_MIN dakikalık adımlarla hesaplanır).
- * Oyuncu: seviyeye göre temel hasar/saat (powerAt) × hasar bonusu × ceza; can seviyeyle artar (hpAt).
- * Canavar değerleri kademe başına hedef av süresinden türetilir: kademe seviyesindeki ortalama donanımlı oyuncu
- * str 1 bir canavarı BAND_HOURS saatte keser. Kademe başına hedef gün: TIER_DAYS (toplam ~5 ay). */
-const STEP_MIN = 5;
-const XP_SCALE = 0.8;                                     // simülasyonla ayarlandı: gerçekçi oyuncu ~5 ay
-const FAIL_HIT = 0.3;                                      // str 1 normal canavar, kesilene kadar oyuncunun can barının bu kadarını vurur
-const BAND_HOURS = [6, 8, 10, 12, 14, 16, 18, 22];
-const REF_BONUS = [0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95, 1.05];        // kademe seviyesinde beklenen hasar bonusu
-const TIER_DAYS = [10, 14, 16, 18, 20, 22, 24, 26];                    // kademe başına hedef gün
+ * Av sürekli akar (uygulama kapalıyken de). Saat başı bir vuruş: (seviye gücü + gümüş kılıcın hasarı) × bonuslar × zincir.
+ * Bütün canavarlar boss gibi uzun sürer. Değerler kademe başına "ortalama oyuncu"dan türetilir: kademe seviyesindeki,
+ * ortalama donanımlı (REF_SWORD), ortalama zincirli (REF_CHAIN) ve ortalama bağlı (REF_LINKS) bir oyuncu str 1 normal bir
+ * canavarı BAND_HOURS saatte keser. Boss ×BOSS.hp. Kusursuz zincirli (Göktaşı +%100) oyuncu belirgin hızlı geçer. */
+const STEP_MIN = 60;
+const XP_SCALE = 0.52;                                    // simülasyonla ayarlandı
+const FAIL_HIT = 0.3;                                      // kaçırılan günde str 1 normal canavarın vuruşu: kademe seviyesindeki canın bu kadarı
+const BAND_HOURS = [29, 41, 52, 64, 75, 84, 93, 102];       // ortalama oyuncu: str 1 normal canavar kaç saatte ölür
+const REF_SWORD = [6, 11, 18, 25, 34, 55, 70, 90];         // kademede beklenen gümüş kılıç ortalaması (güçlendirmeli)
+const REF_CHAIN = [5, 12, 18, 20, 22, 25, 25, 28];         // ortalama oyuncunun zincir hasarı (%)
+const REF_LINKS = [0, 3, 6, 10, 14, 18, 22, 26];           // kart bağı + bane (%)
+const TIER_DAYS = [16, 20, 22, 25, 27, 30, 31, 34];        // ortalama oyuncu için kademe başına hedef gün
 const powerAt = L => 20 * Math.pow(1.11, L - 1);                       // seviyeye göre temel hasar / saat
 const hpAt = L => Math.round(100 + 12 * (L - 1));                      // seviyeye göre en yüksek can
+const refDph = t => { const L = t * 4 + 2.5; return (powerAt(L) + REF_SWORD[t]) * (1 + (REF_LINKS[t] + REF_CHAIN[t]) / 100); };
 const REG = (() => {
-  const OLD_GOLD = [55, 75, 100, 130, 170, 220, 280, 350];
+  const OLD_GOLD = [55, 75, 100, 130, 170, 220, 280, 350];   // oren / gün
   const reg = { hp: [], gold: [], xp: [], hit: [] };
   for (let t = 0; t < 8; t++) {
-    const L = t * 4 + 2.5, dph = powerAt(L) * (1 + REF_BONUS[t]);
-    const killsPerDay = 24 / (BAND_HOURS[t] * 0.8 * 1.25);              // ortalama güç 0.8, %25 dinlenme payı
-    reg.hp.push(Math.round(dph * BAND_HOURS[t]));
-    reg.hit.push(Math.round(FAIL_HIT * hpAt(L)));                         // kaçırılan günde vuruş: kademe seviyesindeki canın FAIL_HIT kadarı
+    const L = t * 4 + 2.5;
+    const killsPerDay = 24 / (BAND_HOURS[t] * 0.8);                     // ortalama güç 0.8
+    reg.hp.push(Math.round(refDph(t) * BAND_HOURS[t]));
+    reg.hit.push(Math.round(FAIL_HIT * hpAt(L)));
     reg.xp.push(Math.round(XP_SCALE * 4 * (100 + 6 * (L - 1)) / (TIER_DAYS[t] * killsPerDay)));
     reg.gold.push(Math.round(OLD_GOLD[t] / killsPerDay * 1.2));
   }
   return reg;
 })();
 const BOSS = { hp: 2.5, gold: 2.5, xp: 1.5, hit: 1.5 };     // boss başarısızlıkta daha sert vurur
-const POTION = { cap: 10, heal: L => 40 + 3 * L, price: L => 40 + 2 * L };   // Swallow (can iksiri): canı sadece bu doldurur
+const POTION = { cap: 10, heal: () => 50, price: () => 100 };   // Swallow (can iksiri): pahalı; hasar almamak ya da toparlanmayı beklemek esas yol
 const REST = { regen: 0.25, resume: 0.9, monHeal: 0.02 };    // dinlenirken saatte canın %25'i; %90'da ava dönülür; canavar saatte %2 toparlanır
-const DEFEAT = { hours: 6, monHeal: 0.25 };                 // yenilince 6 saat toparlanma; canavar canının %25'ini geri kazanır
-const EFFECTS = { tired: { pct: 15, hours: 12 }, exhausted: { pct: 30, hours: 24 } };
+const DEFEAT = { hours: 6, monHeal: 0.25, gold: 0.1 };      // yenilince orenin %10'u gider; toparlanma süresi = canın dolma süresi (savaş dışı iyileşme)
+/* can yenilenmesi (en yüksek canın oranı / saat): avdayken yavaş, yenilgiden sonra toparlanırken hızlı (kontrat her zaman vardır) */
+/* avdayken iyileşme okula göre değişir (Wolf referans: saatte %0,3) */
+const REGEN = { fight: { wolf: 0.003, bear: 0.005, griffin: 0.0035, viper: 0.0025, cat: 0.002, manticore: 0.003 }, idle: 0.15, idleBear: 0.30 };   // idle: yenilgiden sonra toparlanma hızı
+/* simya: Thunderbolt (12 saat hasar +%20), Tawny Owl (alınınca +10 TP), Dancing Star (bomba: rastgele 3–10 saatlik hasar, canın %50'si gider).
+ * Manticore okulu iksirleri (Swallow, White Honey dahil; bombalar hariç) yarı fiyatına alır, Dancing Star'ı ×1,3 vurur. */
+const THUNDER = { pct: 20, hours: 12, price: 120, cap: 5 };
+const OWL = { xp: 10, price: 50 };
+const DANCING = { price: 60, cap: 5, hpCost: 0.5, manticore: 1.3, minH: 3, maxH: 10 };   // 3–10 saatlik hasar (rastgele, tam saat)
+const ALCH_DISCOUNT = 0.5;
+const WOUNDED = { below: 0.5, pct: 20 };                      // can %50'nin altındayken "Yaralı": hasar −%20
+const EFFECTS = { tired: { pct: 15, hours: 12 }, exhausted: { pct: 30, hours: 24 }, focus: { pct: 10, hours: 24, buff: true }, thunder: { pct: THUNDER.pct, hours: THUNDER.hours, buff: true },
+  early: { pct: 15, hours: 12, buff: true }, discipline: { pct: 20, hours: 24, buff: true } };   // early/discipline: kılıç özellikleri   // focus: Viper okulunun erken tamamlama ödülü
 const EFFECT_CAP = 60;
-const BURST = { habit: 1, prep: 0.5, side: 0.25 };          // başarı anında kaç saatlik hasar vurulur
 const HONEY_MAX = 3;
-const CRIT_EVENT = 0.1;                                      // kritik an: adım başına şans = kritik% × 0.1
 const HEAVY = { chance: 0.05, hours: 0.75 };                 // canavarın ağır darbesi: adım başına %5, 45 dakikalık hasar      // boss TP'si normal: asıl ödülü yeni bölge          // boss: bölgenin en güçlüsünün katları
 const BOARD_SIZE = 5;                                               // haftalık kontrat tabelasındaki canavar sayısı
 const MON_HEAL = 0.05;
 const FAINT_GOLD = 0.2, FAINT_GOLD_MAX = 300;                       // bayılınca oren'in %20'si (en çok 300) gider
 const CRIT_MULT = 1.5;
-/* hasar bonusu tavan yerine azalan getiriyle işler: [eşik, bu dilimin geçerlilik oranı]
- * ör. ham +%120 → 60 + 60×0.75 = +%105 */
-const BONUS_STEPS = [[60, 1], [120, 0.75], [180, 0.45], [Infinity, 0.2]];
-function effectiveBonus(raw) {
-  let left = raw, prev = 0, eff = 0;
-  for (const [to, rate] of BONUS_STEPS) { const part = Math.max(0, Math.min(left, to - prev)); eff += part * rate; left -= part; prev = to; if (left <= 0) break; }
-  return Math.round(eff * 10) / 10;
-}
-/* kılıç güçlendirme: +1..+5. Her kademe gümüşe +%6 hasar, çeliğe +%2 kritik verir.
- * Bedel: kılıç fiyatının katı kadar oren + kırıntı (tekrar gelen kartlardan) */
-const UPGRADE = { max: 5, silver: 6, steel: 2, goldMult: [0.25, 0.4, 0.6, 0.85, 1.2], scraps: [10, 20, 35, 50, 75] };
-const LINK_SIZE = 5, LINK_BONUS = 3, LINK_MAX = 10;
+/* kart bağları: kart başına nadirliğe göre katkı (%), bağın ana türü dışında beş kartın da paylaştığı her ek tür +%1,5,
+ * bağın türü okulunun sevdiği türlerdense bağ ×1,5. En fazla 10 bağ. */
+const LINK_SIZE = 5, LINK_MAX = 10, LINK_EXTRA = 1.5, LINK_SCHOOL = 1.5;
+const LINK_RAR = { Common: 0.5, Rare: 0.8, Epic: 1.2, Legendary: 2 };
+const SCHOOL_CATS = { wolf: ['Witcher', 'Soldier', 'Beast'], cat: ['Agent', 'Bandit', 'Crime'], bear: ['Warrior', 'Dwarf', 'Ogroid'], griffin: ['Mage', 'Spell', 'Knight'], viper: ['Elf', 'Alchemy', 'Aristocrat'], manticore: ['Cursed', 'Relict', 'Vampire'] };
+const LINK_BONUS = LINK_RAR.Common * LINK_SIZE;                     // eski adıyla: en düşük bağ değeri
 const SHOP_DAILY = 5;
 /* yenileme bedelleri: demirci aynı gün her yenilemede 100 oren artar; kontrat tabelası ucuz, bölgeyle ve aynı haftadaki tekrarla artar */
 const REROLL = { shop: 100, boardBase: 20, boardPerRegion: 10 };
-const BANE = 15;                                                    // kılıcın bane sınıfındaki canavara ek ham hasar (%)
-/* güçlendirme aktarımı: hedef kılıcın fiyatının %25'i. eritme: fiyatın ve güçlendirme orenin %20'si, kırıntının %50'si geri gelir */
-const TRANSFER_FEE = 0.25, DISMANTLE = { gold: 0.2, scraps: 0.5 };
-const DIAGRAM_FROM_REGION = 3;                                     // 4. kademeden (seviye 13–16: Flotsam, Novigrad) itibaren her boss bir okul seti şeması düşürür
+const BANE = 15;                                                    // kılıcın bane sınıfındaki canavara ek ham hasar (%): Sıradan–Büyülü
+/* avcı özellikleri: kademe yükseldikçe kılıç bir canavar türüne daha karşı bonus kazanır; Efsanevi ve üstünde bonus daha yüksek.
+ * [özellik sayısı, % bonus]. İlk tür swords.js'teki bane, ekler kılıcın kimliğinden sabit (rastgele ama her zaman aynı) seçilir. */
+const BANE_TIERS = { 1: [1, 15], 2: [2, 15], 3: [3, 15], 4: [4, 25], 5: [4, 20], 6: [5, 25] };
+SWORDS.forEach(w => {
+  const [n, pct] = BANE_TIERS[w.tier] || [1, BANE];
+  let h = hashStr('bane:' + w.id) || 1;
+  const rnd = () => { h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; };
+  const pool = Object.keys(CLASSES).filter(c => c !== w.bane), banes = w.bane ? [w.bane] : [];
+  while (banes.length < n && pool.length) banes.push(pool.splice(Math.floor(rnd() * pool.length), 1)[0]);
+  w.banes = banes; w.banePct = pct;
+});
+
+/* benzersiz özellikler: her Efsanevi kılıca havuzdan bir tane (kılıcın kimliğine göre sabit, iki kılıca aynısı gelmez).
+ * Kılıç kuşanılıyken çalışır; gümüş + çelik birlikte en fazla iki özellik. Hasar yüzdeleri zincir/bağ/avcı bonuslarıyla düz toplanır. */
+const UNIQUE = [
+  ['night', 'Gece Avcısı', '22:00–06:00 arası hasar +%30.', 'Night Hunter', '+30% damage from 22:00 to 06:00.'],
+  ['dawn', 'Şafak Işığı', '06:00–12:00 arası hasar +%25.', 'Dawnlight', '+25% damage from 06:00 to 12:00.'],
+  ['noon', 'Öğle Güneşi', '12:00–18:00 arası hasar +%25.', 'Noon Sun', '+25% damage from 12:00 to 18:00.'],
+  ['dusk', 'Alacakaranlık', '18:00–22:00 arası hasar +%35.', 'Twilight', '+35% damage from 18:00 to 22:00.'],
+  ['weekend', 'Hafta Sonu Savaşçısı', 'Cumartesi ve Pazar hasar +%25.', 'Weekend Warrior', '+25% damage on Saturday and Sunday.'],
+  ['monday', 'Pazartesi Öfkesi', 'Pazartesi hasar +%50.', 'Monday Fury', '+50% damage on Monday.'],
+  ['execute', 'İnfazcı', 'Canavarın canı %25\'in altındayken hasar +%50.', 'Executioner', '+50% damage while the monster is below 25% HP.'],
+  ['firstblood', 'İlk Kan', 'Canavarın canı %75\'in üstündeyken hasar +%30.', 'First Blood', '+30% damage while the monster is above 75% HP.'],
+  ['giant', 'Dev Avcısı', 'Boss\'lara hasar +%30.', 'Giant Slayer', '+30% damage against bosses.'],
+  ['elite', 'Elit Avcısı', 'Elit canavarlara hasar +%40.', 'Elite Hunter', '+40% damage against elite monsters.'],
+  ['desperate', 'Çaresizlik', 'Yaralıyken −%20 ceza yerine +%20 hasar.', 'Desperation', 'While Wounded: +20% damage instead of −20%.'],
+  ['fullpower', 'Tam Güç', 'Canın %90\'ın üstündeyken hasar +%20.', 'Full Strength', '+20% damage while your HP is above 90%.'],
+  ['bloodprice', 'Kan Bedeli', 'Hasar +%35, ama aldığın hasar +%25.', 'Blood Price', '+35% damage, but you take 25% more damage.'],
+  ['patient', 'Sabırlı Bıçak', 'Aynı kontratta geçen her 24 saat için hasar +%5 (en çok +%40).', 'Patient Blade', '+5% damage for every 24 hours on the same contract (up to +40%).'],
+  ['quick', 'Hızlı Av', 'Kontratın ilk 12 saati hasar +%50.', 'Swift Hunt', '+50% damage during a contract\'s first 12 hours.'],
+  ['streak', 'Seri Katil', 'Üst üste her öldürme hasarı +%5 artırır (en çok +%25); yenilince sıfırlanır.', 'Killing Spree', 'Each kill in a row adds +5% damage (up to +25%); resets when you are defeated.'],
+  ['loyal', 'Sadık Kılıç', 'Kuşanılı kaldığı her gün +%1 hasar (en çok +%30); çıkarınca sıfırlanır.', 'Loyal Blade', '+1% damage for every day it stays equipped (up to +30%); resets when unequipped.'],
+  ['kin', 'Kardeş Çelik', 'Diğer kuşanılan kılıç da Efsanevi ise hasar +%15.', 'Kindred Steel', '+15% damage if your other equipped sword is also Legendary.'],
+  ['lone', 'Yalnız Kurt', 'Diğer kılıç yuvası boşsa hasar +%35.', 'Lone Wolf', '+35% damage if your other sword slot is empty.'],
+  ['bestiary', 'Bestiyer', 'O türden daha önce kestiğin her canavar için hasar +%1 (en çok +%20).', 'Bestiary', '+1% damage for every monster of that type you have slain (up to +20%).'],
+  ['lord', 'Bölge Hakimi', 'Alt kademe canavarlarına hasar +%50.', 'Lord of the Land', '+50% damage against monsters of lower tiers.'],
+  ['stranger', 'Yabancı Topraklar', 'Yeni kademe açıldıktan sonraki 7 gün hasar +%30.', 'Strange Lands', '+30% damage for 7 days after a new tier opens.'],
+  ['grudge', 'Kin', 'Her aktif ceza (Yorgun/Bitkin) hasarı ayrıca +%10 artırır.', 'Grudge', 'Each active penalty (Tired/Exhausted) also adds +10% damage.'],
+  ['sharp', 'Keskin Kenar', 'Kritik şansı +%8.', 'Keen Edge', '+8% crit chance.'],
+  ['deadly', 'Ölümcül', 'Kritik çarpanı ×1,5 yerine ×2.', 'Deadly', 'Critical hits deal ×2 instead of ×1.5.'],
+  ['bleed', 'Kan Akıtan', 'Kritikten sonraki 3 saat hasar +%25.', 'Bloodletter', '+25% damage for 3 hours after a critical hit.'],
+  ['chaincrit', 'Zincirleme Kritik', 'Kritikten sonraki vuruşta kritik şansı iki katı.', 'Chain Crit', 'After a critical hit, the next hit has double crit chance.'],
+  ['nightcrit', 'Gece Kritiği', '22:00–06:00 arası kritik şansı +%15.', 'Night Crit', '+15% crit chance from 22:00 to 06:00.'],
+  ['lastblow', 'Son Vuruş', 'Canavarın canı %20\'nin altındayken her vuruş kritik.', 'Final Blow', 'Every hit is critical while the monster is below 20% HP.'],
+  ['bounty', 'Ödül Avcısı', 'Canavar oreni +%25.', 'Bounty Hunter', '+25% crowns from monsters.'],
+  ['sage', 'Bilge', 'Canavar TP\'si +%20.', 'Sage', '+20% XP from monsters.'],
+  ['greedy', 'Açgözlü', 'Canavar oreni +%50, TP −%25.', 'Greedy', '+50% crowns from monsters, −25% XP.'],
+  ['veteran', 'Tecrübe', 'Canavar TP\'si +%40, oren −%20.', 'Veteran', '+40% XP from monsters, −20% crowns.'],
+  ['scav', 'Hurdacı', 'Öldürmede +2 kırıntı daha.', 'Scavenger', '+2 extra scraps per kill.'],
+  ['collector', 'Koleksiyoncu', 'Öldürmede %25 şansla ek kart.', 'Collector', '25% chance of an extra card per kill.'],
+  ['trophy', 'Kupa Ustası', 'Boss öldürünce ek bir Efsanevi kart.', 'Trophy Master', 'An extra Legendary card when you kill a boss.'],
+  ['potionhunt', 'İksir Avcısı', 'Öldürmede %30 şansla Swallow.', 'Potion Hunter', '30% chance of a Swallow per kill.'],
+  ['stormharvest', 'Fırtına Hasadı', 'Öldürmede %20 şansla Thunderbolt.', 'Storm Harvest', '20% chance of a Thunderbolt per kill.'],
+  ['starharvest', 'Yıldız Hasadı', 'Öldürmede %20 şansla Dancing Star.', 'Star Harvest', '20% chance of a Dancing Star per kill.'],
+  ['harvest', 'Hasat', 'Öldürünce canın %25\'i dolar.', 'Harvest', 'Heal 25% of your HP on a kill.'],
+  ['stone', 'Taş Deri', 'Aldığın hasar −%25.', 'Stoneskin', 'You take 25% less damage.'],
+  ['lifebond', 'Yaşam Bağı', 'Avda can yenilenmesi ×3.', 'Life Bond', 'HP regeneration while hunting ×3.'],
+  ['leech', 'Kan Emici', 'Her saatlik vuruş canının %0,7\'sini doldurur.', 'Leech', 'Every hourly hit heals 0.7% of your HP.'],
+  ['hpshield', 'Can Kalkanı', 'En yüksek can +%25.', 'Vital Ward', '+25% max HP.'],
+  ['lastbreath', 'Son Nefes', 'Haftada bir kez ölümcül darbeden 1 canla kurtulursun.', 'Last Breath', 'Once a week you survive a killing blow with 1 HP.'],
+  ['quickrecover', 'Çabuk Toparlanma', 'Yenilince iki kat hızlı toparlanırsın.', 'Quick Recovery', 'You recover twice as fast after a defeat.'],
+  ['purse', 'Sıkı Kese', 'Yenilince oren kaybetmezsin.', 'Tight Purse', 'You lose no crowns when defeated.'],
+  ['thorns', 'Diken', 'Canavar sana vurunca ona 3 saatlik hasarın kadar karşılık verirsin.', 'Thorns', 'When the monster hits you, you strike back for 3 hours of your damage.'],
+  ['steady', 'Sağlam Duruş', 'Gecikmede canavar vuramaz (kaçırmada vurur).', 'Steady Stance', 'The monster can\'t strike when you are late (it still does when you miss).'],
+  ['swallowmaster', 'Swallow Ustası', 'Swallow 50 yerine 100 can doldurur.', 'Swallow Master', 'Swallow heals 100 HP instead of 50.'],
+  ['stormcaller', 'Fırtına Çağıran', 'Thunderbolt 12 yerine 24 saat sürer.', 'Stormcaller', 'Thunderbolt lasts 24 hours instead of 12.'],
+  ['focusmind', 'Odaklı Zihin', 'Güçlendirmeler (Odak, Thunderbolt...) ×1,5.', 'Focused Mind', 'Buffs (Focus, Thunderbolt...) ×1.5.'],
+  ['fireproof', 'Ateşe Dayanıklı', 'Dancing Star canının %50\'si yerine %25\'ini alır.', 'Fireproof', 'Dancing Star costs 25% of your HP instead of 50%.'],
+  ['bomber', 'Bombacı', 'Dancing Star hasarı ×1,5.', 'Bombardier', 'Dancing Star damage ×1.5.'],
+  ['honeybearer', 'Bal Taşıyıcı', 'White Honey taşıma sınırı 3 yerine 6.', 'Honey Bearer', 'You can carry 6 White Honey instead of 3.'],
+  ['resonance', 'Zincir Rezonansı', 'Zincirlerden gelen hasar bonusu ×1,25.', 'Chain Resonance', 'Damage bonus from chains ×1.25.'],
+  ['linkmaster', 'Bağ Ustası', 'Kart bağı bonusları ×1,3.', 'Link Master', 'Card link bonuses ×1.3.'],
+  ['early', 'Erkenci', 'Görevi erken yapınca (Viper kuralı) 12 saat hasar +%15.', 'Early Bird', 'Doing a quest early (Viper rule) gives +15% damage for 12 hours.'],
+  ['atoner', 'Kefaretçi', 'Kefaret 1 gün kısa (en az 1 gün).', 'Atoner', 'Atonement takes one day less (at least 1).'],
+  ['rested', 'Dinlenmiş', 'Dinlenme günlerinde hasar +%40.', 'Well Rested', '+40% damage on rest days.'],
+  ['discipline', 'Disiplin', 'Günün bütün alışkanlıkları başarılıysa ertesi gün sonuna kadar hasar +%20.', 'Discipline', 'If all of the day\'s habits succeed, +20% damage until the end of the next day.'],
+  ['rustproof', 'Pas Tutmaz', 'Geciken gün zincire paslı halka eklemez (Yorgun yine olursun).', 'Rustproof', 'A late day adds no rusty link to the chain (you still become Tired).'],
+  ['tireless', 'Yorulmaz', 'Yorgun olmazsın.', 'Tireless', 'You never become Tired.'],
+  ['resolute', 'Kararlı', 'Bitkin süresi 24 yerine 8 saat.', 'Resolute', 'Exhausted lasts 8 hours instead of 24.'],
+  ['cardluck', 'Kart Talihi', 'Alışkanlık başarısında %15 şansla ek kart.', 'Card Luck', '15% chance of an extra card on a habit success.'],
+  ['goldwind', 'Altın Rüzgârı', 'Her alışkanlık başarısında +15 oren.', 'Golden Wind', '+15 crowns on every habit success.'],
+].map(([id, name, desc, en, desc_en]) => bi({ id, name, desc }, { name: en, desc: desc_en }));
+/* Aerondight: Göl Hanımı'nın kılıcı. Her 24 saatlik vuruşta 1 şarj (+%5 hasar, en çok 20 → +%100; kesintisiz 20 gün). Gecikme yarısını, kaçırma ya da yenilgi hepsini götürür.
+ * Şarj tamken her 12. vuruş 12 saatlik hasar vurur; başarısızlık vuruşları yarıya iner, Bitkin 12 saat sürer. */
+const AERO = { per: 5, max: 20, hours: 24, every: 12, burst: 12, strike: 0.5, exhausted: 12 };
+const AERO_TRAIT = bi({ id: 'aerondight', name: 'Göl Hanımı\'nın Kutsaması',
+  desc: `Her ${AERO.hours} saatlik vuruş bir şarj ekler: şarj başına hasar +%${AERO.per} (en çok ${AERO.max} şarj, +%${AERO.per * AERO.max}). Gecikince şarjın yarısı, kaçırınca ya da yenilince hepsi gider. Şarj tamken her ${AERO.every}. vuruş ${AERO.burst} saatlik hasar vurur, canavarın başarısızlık vuruşları yarıya iner ve Bitkin ${AERO.exhausted} saat sürer.` },
+  { name: "Blessing of the Lady of the Lake", desc: `Every ${AERO.hours} hours of hits add a charge: +${AERO.per}% damage per charge (up to ${AERO.max} charges, +${AERO.per * AERO.max}%). Being late loses half the charge; missing a day or being defeated loses all of it. At full charge every ${AERO.every}th hit deals ${AERO.burst} hours of damage, monster strikes on failure are halved and Exhausted lasts ${AERO.exhausted} hours.` });
+const UNIQUE_BY_ID = Object.fromEntries([...UNIQUE, AERO_TRAIT].map(u => [u.id, u]));
+(() => {
+  const legs = SWORDS.filter(w => w.tier === 4 && !w.set).sort((a, b) => a.id.localeCompare(b.id)), r = seeded(hashStr('unique-traits')), pool = UNIQUE.map(u => u.id);
+  legs.forEach(w => { if (pool.length) w.unique = pool.splice(Math.floor(r() * pool.length), 1)[0]; });
+  SWORDS.filter(w => w.tier === 6).forEach(w => { w.unique = 'aerondight'; });
+})();
+const DISMANTLE = { gold: 0.2 };                                   // eritince fiyatının %20'si + seviyesinin yarısı kadar kırıntı
+const DIAGRAM_FROM_REGION = 1;                                     // 2. kademeden (seviye 5–8: Lyria, Vizima) itibaren her boss bir okul seti şeması düşürür (en düşük aşamadan başlayarak)
 const SET_CRAFT_SCRAPS = 100;
+const LEGEND_PRICE = 1.5;                                          // demircide Efsanevi ve Kadim kılıçlar %50 pahalı
 const RETRO_HOURS = 24;
 /* son oyun (efsane olduktan sonra): kesilmiş canavarlar ve bölge boss'ları elit olarak geri döner; 32'den sonraki TP Ün (★) olur */
 const ELITE = { hp: 1.3, gold: 1.25, xp: 1.25 };
@@ -196,6 +333,7 @@ const ACHIEVEMENTS = [
   { id: 'chain-7', group: 'Alışkanlık', icon: '⛓', name: 'Çelik Zincir', desc: '7 halkalık zincir.', gold: 50, test: h => h.chainBest >= 7, prog: h => [h.chainBest, 7] },
   { id: 'chain-14', group: 'Alışkanlık', icon: '⛓', name: 'Gümüş Zincir', desc: '14 halkalık zincir.', gold: 100, test: h => h.chainBest >= 14, prog: h => [h.chainBest, 14] },
   { id: 'chain-30', group: 'Alışkanlık', icon: '⛓', name: 'Altın Zincir', desc: '30 halkalık zincir.', gold: 200, card: 'Epic', test: h => h.chainBest >= 30, prog: h => [h.chainBest, 30] },
+  { id: 'chain-40', group: 'Alışkanlık', icon: '⛓', name: 'Mithril Zincir', desc: '40 halkalık zincir.', gold: 300, card: 'Legendary', test: h => h.chainBest >= 40, prog: h => [h.chainBest, 40] },
   { id: 'chain-60', group: 'Alışkanlık', icon: '☄', name: 'Göktaşı', desc: '60 halkalık zincir.', gold: 400, card: 'Legendary', test: h => h.chainBest >= 60, prog: h => [h.chainBest, 60] },
   { id: 'repair', group: 'Alışkanlık', icon: '⚒', name: 'Kefaret', desc: 'Kırılan zinciri kefaretle onar.', gold: 75, test: h => h.repairs >= 1 },
   { id: 'perfect-week', group: 'Alışkanlık', icon: '🗓', name: 'Kusursuz Hafta', desc: 'Pazartesiden pazara 7 günün hepsi başarılı.', gold: 150, test: h => h.perfectWeek },
@@ -213,21 +351,28 @@ const ACHIEVEMENTS = [
   { id: 'legend', group: 'Av', icon: '🐺', name: 'Efsane', desc: 'Son boss\'u yen.', gold: 500, card: 'Legendary', test: h => h.legend },
   { id: 'first-sword', group: 'Teçhizat', icon: '🗡', name: 'İlk Kılıç', desc: 'İlk kılıcını edin.', gold: 25, test: h => h.swords >= 1 },
   { id: 'swords-10', group: 'Teçhizat', icon: '🛡', name: 'Silahlık', desc: 'Aynı anda 10 kılıca sahip ol.', gold: 150, test: h => h.swords >= 10, prog: h => [h.swords, 10] },
-  { id: 'plus-five', group: 'Teçhizat', icon: '⚒', name: 'Usta Demirci', desc: 'Bir kılıcı +5\'e çıkar.', gold: 200, test: h => h.maxUp >= 5, prog: h => [h.maxUp, 5] },
+  { id: 'plus-five', group: 'Teçhizat', icon: '⚒', name: 'Usta Demirci', desc: 'Kılıçlarını toplam 25 kez yükselt.', gold: 200, test: h => h.forged >= 25, prog: h => [h.forged, 25] },
   { id: 'school-set', group: 'Teçhizat', icon: '📜', name: 'Okulun Mirası', desc: 'Kendi okulunun bir set kılıcını yaptır.', gold: 200, test: h => h.ownSchoolSet },
   { id: 'legendary-card', group: 'Kartlar', icon: '🃏', name: 'Efsanevi Kart', desc: 'İlk efsanevi kartını bul.', gold: 50, test: h => h.legendaryCards >= 1 },
   { id: 'cards-150', group: 'Kartlar', icon: '🃏', name: 'Koleksiyoncu', desc: 'Bir karakterle 150 farklı kart.', gold: 200, test: h => h.uniqueCards >= 150, prog: h => [h.uniqueCards, 150] },
   { id: 'links-5', group: 'Kartlar', icon: '🔗', name: 'Bağ Ustası', desc: '5 tamamlanmış kart bağı.', gold: 150, test: h => h.links >= 5, prog: h => [h.links, 5] },
   { id: 'links-10', group: 'Kartlar', icon: '🔗', name: 'Bağların Efendisi', desc: '10 tamamlanmış kart bağı.', gold: 300, card: 'Epic', test: h => h.links >= 10, prog: h => [h.links, 10] },
+  { id: 'link-legend', group: 'Kartlar', icon: '💠', name: 'Saf Efsane', desc: 'Beş efsanevi karttan bir bağ kur.', gold: 300, card: 'Legendary', test: h => h.linkAllLegend },
+  { id: 'link-double', group: 'Kartlar', icon: '🔗', name: 'Çifte Uyum', desc: 'Beş kartın da en az bir ek türü paylaştığı bir bağ kur (ör. Human + Soldier).', gold: 150, test: h => h.linkExtraMax >= 1 },
+  { id: 'link-triple', group: 'Kartlar', icon: '⛓', name: 'Üçlü Uyum', desc: 'Beş kartın da iki ek türü paylaştığı bir bağ kur.', gold: 300, card: 'Epic', test: h => h.linkExtraMax >= 2 },
+  { id: 'link-school', group: 'Kartlar', icon: '🏫', name: 'Okulun Yolu', desc: 'Okulunun sevdiği türlerden 3 bağ kur.', gold: 200, test: h => h.linkSchool >= 3, prog: h => [h.linkSchool, 3] },
+  { id: 'link-factions', group: 'Kartlar', icon: '🌍', name: 'Kıtanın Sesi', desc: '4 farklı fraksiyondan tamamlanmış bağ (tarafsız dahil).', gold: 250, card: 'Epic', test: h => h.linkFactions >= 4, prog: h => [h.linkFactions, 4] },
+  { id: 'link-value', group: 'Kartlar', icon: '✨', name: 'Mükemmel Deste', desc: 'Kart bağlarından toplam +%60 hasar.', gold: 400, card: 'Legendary', test: h => h.linkTotal >= 60, prog: h => [Math.round(h.linkTotal), 60] },
   { id: 'rebirth', group: 'Okul', icon: '♻', name: 'Yeniden Doğuş', desc: 'İlk kez yeniden doğ.', gold: 200, test: h => h.hall >= 1 },
 ];
-const ACH_GROUP_EN = { 'Alışkanlık': 'Habit', 'Av': 'Hunt', 'Teçhizat': 'Gear', 'Kartlar': 'Cards', 'Okul': 'School' };
+const ACH_GROUP_EN = { 'Alışkanlık': 'Habit', 'Av': 'Hunt', 'Bölgeler': 'Regions', 'Teçhizat': 'Gear', 'Kartlar': 'Cards', 'Okul': 'School' };
 const ACH_EN = {
   'first-dawn': ['First Dawn', 'First successful day.'],
   rest: ['Rest, Witcher', 'Declare your first rest day in advance.'],
   'chain-7': ['Steel Chain', 'A chain of 7 links.'],
   'chain-14': ['Silver Chain', 'A chain of 14 links.'],
   'chain-30': ['Golden Chain', 'A chain of 30 links.'],
+  'chain-40': ['Mithril Chain', 'A chain of 40 links.'],
   'chain-60': ['Meteorite', 'A chain of 60 links.'],
   repair: ['Atonement', 'Repair a broken chain through atonement.'],
   'perfect-week': ['Perfect Week', 'All 7 days from Monday to Sunday successful.'],
@@ -245,34 +390,61 @@ const ACH_EN = {
   legend: ['Legend', 'Defeat the final boss.'],
   'first-sword': ['First Sword', 'Get your first sword.'],
   'swords-10': ['Armory', 'Own 10 swords at once.'],
-  'plus-five': ['Master Smith', 'Upgrade a sword to +5.'],
+  'plus-five': ['Master Smith', 'Upgrade your swords 25 times in total.'],
   'school-set': ['School Legacy', 'Have a set sword of your own school crafted.'],
   'legendary-card': ['Legendary Card', 'Find your first legendary card.'],
   'cards-150': ['Collector', '150 different cards with one character.'],
   'links-5': ['Link Master', '5 completed card links.'],
   'links-10': ['Lord of Links', '10 completed card links.'],
+  'link-legend': ['Pure Legend', 'Build a link of five legendary cards.'],
+  'link-double': ['Double Bond', 'Build a link whose five cards all share an extra category (e.g. Human + Soldier).'],
+  'link-triple': ['Triple Bond', 'Build a link whose five cards share two extra categories.'],
+  'link-school': ["The School's Way", "Build 3 links of your school's favoured categories."],
+  'link-factions': ['Voice of the Continent', 'Completed links from 4 different factions (neutral included).'],
+  'link-value': ['Perfect Deck', 'A total of +60% damage from card links.'],
   rebirth: ['Rebirth', 'Be reborn for the first time.'],
 };
 ACHIEVEMENTS.forEach(a => bi(a, { group: ACH_GROUP_EN[a.group] || a.group, name: ACH_EN[a.id]?.[0] || a.name, desc: ACH_EN[a.id]?.[1] || a.desc }));
+/* bölge başarımları: her bölgenin bütün canavarlarını (boss dahil) tek karakterle öldür. Ödül kademeyle artar. */
+REGIONS.forEach((r, i) => {
+  if (r.id === 'all') return;
+  const total = () => MONSTERS.filter(m => m.region === i).length;
+  const a = { id: 'region-' + r.id, icon: r.tier >= 6 ? '🏰' : r.tier >= 3 ? '🗺' : '🧭', gold: 100 + 60 * r.tier,
+    card: r.tier >= 5 ? 'Legendary' : r.tier >= 2 ? 'Epic' : 'Rare',
+    test: h => total() > 0 && (h.regionKills[i] || 0) >= total(), prog: h => [h.regionKills[i] || 0, total()] };
+  Object.defineProperty(a, 'group', { get: () => L('Bölgeler', 'Regions'), enumerable: true });
+  Object.defineProperty(a, 'name', { get: () => L(`${r.name} temizlendi`, `${r.name} cleared`), enumerable: true });
+  Object.defineProperty(a, 'desc', { get: () => L(`${r.name} bölgesindeki bütün canavarları (boss dahil) tek karakterle öldür.`, `Kill every monster in ${r.name} (boss included) with one character.`), enumerable: true });
+  ACHIEVEMENTS.push(a);
+});
 const SHOP = [
   { id: 'keg', name: 'Kart Fıçısı', desc: '3 kart, biri en az Nadir.', price: 60 },
   { id: 'bigkeg', name: 'Büyük Fıçı', desc: '5 kart, biri en az Destansı.', price: 180 },
-  { id: 'swallow', name: 'Swallow', desc: 'Can iksiri. Canın kendiliğinden dolmaz; savaş panelinden içersin. En fazla 10 tane.', price: 40 },
-  { id: 'honey', name: 'White Honey', desc: 'Kaçırılan bir günde kendiliğinden içilir: "Bitkin" olmazsın. Zinciri korumaz. En fazla 3 tane.', price: 60 },
+  { id: 'swallow', name: 'Swallow', desc: 'Can iksiri: +50 can. Pahalıdır; savaş panelinden içersin. En fazla 10 tane.', price: 200 },
+  { id: 'honey', name: 'White Honey', desc: 'Kaçırılan bir günde kendiliğinden içilir: canavar vuramaz, "Bitkin" olmazsın. Zinciri korumaz. En fazla 3 tane.', price: 60 },
+  { id: 'thunder', name: 'Thunderbolt', desc: `İçince ${THUNDER.hours} saat boyunca hasarın +%${THUNDER.pct}. Savaş panelinden içersin. En fazla ${THUNDER.cap} tane.`, price: THUNDER.price },
+  { id: 'owl', name: 'Tawny Owl', desc: `Alınca hemen içilir: +${OWL.xp} TP.`, price: OWL.price },
+  { id: 'dancing', name: 'Dancing Star', desc: `Bomba: canavara rastgele ${DANCING.minH}–${DANCING.maxH} saatlik hasarın kadar vurur, ama canının %${DANCING.hpCost * 100}'si gider. Savaş panelinden atarsın. En fazla ${DANCING.cap} tane.`, price: DANCING.price },
 ];
+const ALCHEMY = ['swallow', 'honey', 'thunder', 'owl'];   // Manticore indirimi bunlara (bombalar hariç)
 const SHOP_EN = {
   keg: ['Card Keg', '3 cards, at least one Rare.'],
   bigkeg: ['Large Keg', '5 cards, at least one Epic.'],
-  swallow: ['Swallow', "Healing potion. HP doesn't refill on its own; drink it from the combat panel. Max 10."],
-  honey: ['White Honey', 'Drunk automatically on a missed day: you don\'t become "Exhausted". Doesn\'t protect the chain. Max 3.'],
+  swallow: ['Swallow', 'Healing potion: +50 HP. Expensive; drink it from the combat panel. Max 10.'],
+  honey: ['White Honey', 'Drunk automatically on a missed day: the monster can\'t strike and you don\'t become "Exhausted". Doesn\'t protect the chain. Max 3.'],
+  thunder: ['Thunderbolt', `Drink it for +${THUNDER.pct}% damage for ${THUNDER.hours} hours. Drink it from the combat panel. Max ${THUNDER.cap}.`],
+  owl: ['Tawny Owl', `Drunk on purchase: +${OWL.xp} XP.`],
+  dancing: ['Dancing Star', `Bomb: hits the monster for a random ${DANCING.minH}–${DANCING.maxH} hours of your damage, but costs ${DANCING.hpCost * 100}% of your HP. Throw it from the combat panel. Max ${DANCING.cap}.`],
 };
 SHOP.forEach(i => bi(i, { name: SHOP_EN[i.id][0], desc: SHOP_EN[i.id][1] }));
 /* canavar değerleri: bölgenin en yüksek değerleri × canavarın bölge içi gücü (str) */
+/* oyunun üçte birlik dilimlerine göre can çarpanı: kademe 1–3 ×1.2, 4–6 ×1.5, 7–8 ×2 */
+const HP_MULT = [1.2, 1.2, 1.2, 1.5, 1.5, 1.5, 2, 2];
 function monStats(m, elite = false) {
   const r = Math.min(REG.hp.length - 1, regionTier(m.region || 0));
   const f = m.str || 0.75, b = m.boss, e = elite ? ELITE : { hp: 1, gold: 1, xp: 1 };
   return {
-    hp: Math.round(REG.hp[r] * f * (b ? BOSS.hp : 1) * e.hp),
+    hp: Math.round(REG.hp[r] * (HP_MULT[r] ?? 1) * f * (b ? BOSS.hp : 1) * e.hp),
     gold: Math.max(5, Math.round(REG.gold[r] * f * (b ? BOSS.gold : 1) * e.gold / 5) * 5),
     xp: Math.max(1, Math.round(REG.xp[r] * f * (b ? BOSS.xp : 1) * e.xp)),
     hit: Math.round(REG.hit[r] * (0.6 + 0.4 * f) * (b ? BOSS.hit : 1) * (elite ? 1.15 : 1)),   // başarısızlıkta (kaçırma) vuruşu
@@ -370,6 +542,7 @@ function flavorText(kind, m, d) {
  * Her alışkanlığın kendi zinciri, günleri ve ilerlemesi vardır. En fazla MAX_HABITS tane aynı anda. */
 const HABIT_TYPES = ['sleep', 'window', 'count', 'check'];
 const MAX_HABITS = 5;
+const MAX_ITEMS = 20;                                               // bir alışkanlıkta en fazla alt görev
 const CHAIN_WEIGHTS = [1, 0.5, 1 / 3, 0.25, 0.2];                  // zincir hasar bonusu: en güçlüsü tam, sonrakiler azalarak
 const DAY_END = '03:00';                                           // adet ve yaptım/yapmadım türlerinde gün ertesi gece bu saate kadar sürer
 const habitTypeName = t => ({ sleep: L('Uyku', 'Sleep'), window: L('Saat aralığı', 'Time window'), count: L('Adet', 'Count'), check: L('Yaptım / yapmadım', 'Done / not done') }[t] || t);
@@ -387,6 +560,12 @@ function makeQuest(cfg) {
   if (q.type === 'sleep') q.sleep = { bedStart: '00:00', bedEnd: '02:00', wakeStart: '08:00', wakeEnd: '08:30', ...(cfg.sleep || {}) };
   else if (q.type === 'window') q.daily = { start: '18:00', end: '22:00', ...(cfg.daily || {}) };
   else if (q.type === 'count') q.count = { target: Math.max(1, Math.round(+cfg.count?.target || 8)), unit: String(cfg.count?.unit || '').trim().slice(0, 20) };
+  /* alt görevler (adet ve yaptım/yapmadım türünde): ör. "Vitamin al" → D vitamini, Omega 3, B12.
+   * Adette her alt görev 1 sayılır ve günlük hedef alt görev sayısı olur; yaptım/yapmadımda hepsi işaretlenince gün tamamlanır. */
+  if (q.type === 'count' || q.type === 'check') {
+    const items = [...new Set((Array.isArray(cfg.items) ? cfg.items : []).map(x => String(x || '').trim().slice(0, 40)).filter(Boolean))].slice(0, MAX_ITEMS);
+    if (items.length) { q.items = items; if (q.type === 'count') q.count.target = items.length; }
+  }
   return q;
 }
 function makeHabit(cfg) {
@@ -428,11 +607,13 @@ function validateQuest(q) {
 /* ---------- yeni kayıt / karakter ---------- */
 function freshChain() { return { len: 0, rust: false, repair: null, links: [], best: 0, bestTier: 0 }; }
 function freshCharacter({ name, school, faction, nowDate }) {
+  const sch = SCHOOLS[school] ? school : 'wolf', kit = START_KIT[sch];
+  const sw = [kit.silver, kit.steel].filter(id => id && swordById(id));
   return {
     charId: uid(), charStart: nowDate.toISOString(),
-    name: name || 'Witcher', school: SCHOOLS[school] ? school : 'wolf', faction: FACTIONS.includes(faction) ? faction : null, avatar: null,
-    hp: school === 'bear' ? 140 : 100, xp: 0, level: 1, gold: 50, scraps: 0, swallow: 3, honey: 1, combat: null, queue: [],
-    collection: {}, links: [], swords: { owned: [], silver: null, steel: null, up: {} }, diagrams: [],
+    name: name || 'Witcher', school: sch, faction: FACTIONS.includes(faction) ? faction : null, avatar: null,
+    hp: sch === 'bear' ? 140 : 100, xp: 0, level: 1, gold: kit.gold, scraps: kit.scraps, swallow: kit.swallow, honey: kit.honey, thunder: kit.thunder || 0, dancing: kit.dancing || 0, combat: null, queue: [],
+    collection: {}, factionsDone: [], links: [], swords: { owned: sw, silver: swordById(kit.silver) ? kit.silver : null, steel: swordById(kit.steel) ? kit.steel : null, lv: Object.fromEntries(sw.map(id => [id, 1])) }, diagrams: [],
     trophies: [], region: 0, boards: {}, rerolls: {}, contract: null, legend: false, fame: 0, draws: 0, pity: 0,
     stats: { goldEarned: 0, dmg: 0, crits: 0 },
   };
@@ -555,6 +736,12 @@ function migrate(s) {
     s.v = 12;
   }
   s.effects ||= []; s.queue ||= [];
+  s.thunder ??= 0; s.dancing ??= 0; delete s.huntPaused;   // kontrat iptali kalktı: av hiç durmaz
+  if (s.swords) {                          // eski +1..+5 güçlendirmeler kalktı: elindeki kılıçlar karakterin seviyesine gelir
+    s.swords.lv ||= {};
+    (s.swords.owned || []).forEach(id => { if (!s.swords.lv[id]) s.swords.lv[id] = Math.max(1, s.level || 1); });
+    delete s.swords.up;
+  }
   s.rerolls ||= {};
   s.achievements ||= {}; s.counters ||= { repairs: 0 }; s.weekly ||= []; if (s.pendingSummary === undefined) s.pendingSummary = null;
   // denge değerleri değiştiyse aktif kontratın canını kalan oranı koruyarak güncel değere çevir
@@ -588,8 +775,20 @@ function createEngine(state, opts = {}) {
   const C = () => Q().chain;
   const on = (hid, fn) => { const prev = H; H = (hid && typeof hid === 'object') ? hid : (hid && habitById(hid)) || Q(); try { return fn(); } finally { H = prev; } };
   const sc = () => state.school;
+  /* kuşanılan kılıçların benzersiz özellikleri */
+  const eqSwords = () => [swordById(state.swords?.silver), swordById(state.swords?.steel)].filter(Boolean);
+  const has = id => eqSwords().some(w => w.unique === id);
+  const holderOf = id => eqSwords().find(w => w.unique === id) || null;
+  const otherOf = id => { const w = holderOf(id); return w ? swordById(state.swords[w.type === 'silver' ? 'steel' : 'silver']) : null; };
+  const uName = id => UNIQUE_BY_ID[id]?.name || id;
+  const hourAt = t => new Date(t.getTime() - 1).getHours();             // saat başı vuruş, biten saate sayılır
+  const isNight = t => { const h = hourAt(t); return h >= 22 || h < 6; };
+  const markEquip = id => { (state.swords.since ||= {})[id] = clockNow().toISOString(); };
+  const aeroOn = () => has('aerondight');
+  const aeroFull = () => aeroOn() && (state.aero?.charge || 0) >= AERO.max;
+  const repairNeed = () => Math.max(1, (sc() === 'griffin' ? 1 : REPAIR_NEED) - (has('atoner') ? 1 : 0));
   const isSleep = () => Q().type === 'sleep';
-  const maxHp = () => Math.round(hpAt(state.level || 1) * (sc() === 'bear' ? 1.4 : 1));
+  const maxHp = () => Math.round(hpAt(state.level || 1) * (sc() === 'bear' ? 1.4 : 1) * (has('hpshield') ? 1.25 : 1));
   const idle = opts.idle !== false;
   let logClock = null;                                     // geçmişe dönük savaş hesabında olayların zamanı
   const clockNow = () => logClock || now();
@@ -706,13 +905,17 @@ function createEngine(state, opts = {}) {
   }
   /* --- etkiler (alışkanlık cezaları): hasarı düşürür, süre bitince kalkar --- */
   function expireEffects(t = clockNow()) { state.effects = (state.effects || []).filter(e => new Date(e.until) > t); }
-  const debuffPct = (t = clockNow()) => Math.min(EFFECT_CAP, (state.effects || []).filter(e => new Date(e.until) > t).reduce((s, e) => s + e.pct, 0));
-  function addEffect(kind, src) {
-    const d = EFFECTS[kind], t = clockNow();
+  const activeFx = t => (state.effects || []).filter(e => new Date(e.until) > t);
+  const debuffPct = (t = clockNow()) => Math.min(EFFECT_CAP, activeFx(t).filter(e => !EFFECTS[e.kind]?.buff).reduce((s, e) => s + e.pct, 0));
+  const buffPct = (t = clockNow()) => activeFx(t).filter(e => EFFECTS[e.kind]?.buff).reduce((s, e) => s + e.pct, 0);   // farklı güçlendirmeler toplanır (aynı tür üst üste binmez)
+  function addEffect(kind, src, hours) {
+    const d = { ...EFFECTS[kind], ...(hours ? { hours: +hours.toFixed(1) } : {}) }, t = clockNow();
+    if (d.buff) state.effects = state.effects.filter(e => e.kind !== kind);   // güçlendirme üst üste binmez, süresi yenilenir
     const e = { id: uid(), kind, pct: d.pct, until: addMin(t, d.hours * 60).toISOString(), src };
     state.effects.push(e);
-    const nm = kind === 'tired' ? L('Yorgun', 'Tired') : L('Bitkin', 'Exhausted');
-    log(L(`${nm}: ${d.hours} saat boyunca hasarın −%${d.pct}${src ? ` (${src})` : ''}.`, `${nm}: −${d.pct}% damage for ${d.hours} hours${src ? ` (${src})` : ''}.`), 'bad');
+    const nm = { tired: L('Yorgun', 'Tired'), exhausted: L('Bitkin', 'Exhausted'), focus: L('Odak', 'Focus'), thunder: 'Thunderbolt', early: uName('early'), discipline: uName('discipline') }[kind];
+    if (d.buff) log(L(`${nm}: ${d.hours} saat boyunca hasarın +%${d.pct}${src ? ` (${src})` : ''}.`, `${nm}: +${d.pct}% damage for ${d.hours} hours${src ? ` (${src})` : ''}.`), 'good');
+    else log(L(`${nm}: ${d.hours} saat boyunca hasarın −%${d.pct}${src ? ` (${src})` : ''}.`, `${nm}: −${d.pct}% damage for ${d.hours} hours${src ? ` (${src})` : ''}.`), 'bad');
     return e.id;
   }
 
@@ -726,13 +929,13 @@ function createEngine(state, opts = {}) {
     c.len++; c.rust = false; addLink(k, 'ok');
     if (c.repair) {
       c.repair.got++;
-      if (c.repair.got >= REPAIR_NEED) {
+      if (c.repair.got >= repairNeed()) {
         c.len = c.repair.preLen + c.repair.got;
         state.counters ||= {}; state.counters.repairs = (state.counters.repairs || 0) + 1;
         log(L(`Kefaret tamamlandı! Kırık halka onarıldı, zincir ${c.len} halkaya döndü.`, `Atonement complete! The broken link is repaired; your chain is back to ${c.len} links.`), 'epic');
         toast(L('Zincir onarıldı!', 'Chain repaired!'), 'good');
         c.repair = null;
-      } else log(L(`Kefaret ${c.repair.got}/${REPAIR_NEED}. Bir gün daha başarırsan ${c.repair.preLen} halka geri gelecek.`, `Atonement ${c.repair.got}/${REPAIR_NEED}. One more successful day brings back ${c.repair.preLen} links.`), 'good');
+      } else log(L(`Kefaret ${c.repair.got}/${repairNeed()}. Bir gün daha başarırsan ${c.repair.preLen} halka geri gelecek.`, `Atonement ${c.repair.got}/${repairNeed()}. One more successful day brings back ${c.repair.preLen} links.`), 'good');
     }
     c.best = Math.max(c.best, c.len);
     const after = tierOf(c.len);
@@ -749,12 +952,13 @@ function createEngine(state, opts = {}) {
     c.repair = preLen > c.len ? { preLen, got: 0, from: k } : null;
     addLink(k, 'break'); fx('bad');
     if (preLen === 0) { log(L(`Zincir kırıldı (${why}), ama zaten boştu.`, `Chain broken (${why}), but it was already empty.`), 'bad'); return; }
-    log(L(`Zincir kırıldı (${why})! ${preLen} → ${c.len} halka${t > 0 ? `, ${TIERS[t].name} → ${TIERS[t - 1].name}` : ''}. Kefaret: sonraki ${REPAIR_NEED} günü başarırsan ${preLen} halka geri gelir.`,
-      `Chain broken (${why})! ${preLen} → ${c.len} links${t > 0 ? `, ${TIERS[t].name} → ${TIERS[t - 1].name}` : ''}. Atonement: succeed the next ${REPAIR_NEED} days and ${preLen} links come back.`), 'bad');
+    log(L(`Zincir kırıldı (${why})! ${preLen} → ${c.len} halka${t > 0 ? `, ${TIERS[t].name} → ${TIERS[t - 1].name}` : ''}. Kefaret: sonraki ${repairNeed()} günü başarırsan ${preLen} halka geri gelir.`,
+      `Chain broken (${why})! ${preLen} → ${c.len} links${t > 0 ? `, ${TIERS[t].name} → ${TIERS[t - 1].name}` : ''}. Atonement: succeed the next ${repairNeed()} days and ${preLen} links come back.`), 'bad');
     toast(L('Zincir kırıldı! Kefaret yolu açık.', 'Chain broken! The path of atonement is open.'), 'bad');
   }
   function chainLate(k) {
     const c = C();
+    if (has('rustproof')) { log(L(`${uName('rustproof')}: geç kaldın ama zincir paslanmadı.`, `${uName('rustproof')}: you were late, but the chain didn't rust.`), ''); return; }
     if (c.rust) return chainBreak(k, L('üst üste iki paslı halka', 'two rusty links in a row'));
     c.rust = true; addLink(k, 'rust');
     if (c.repair) { log(L('Geç kalmak kefareti bozdu. Kırık halka kalıcı oldu.', 'Being late ruined the atonement. The broken link is permanent.'), 'bad'); c.repair = null; }
@@ -807,9 +1011,23 @@ function createEngine(state, opts = {}) {
     log(L(`${REGIONS[r].name} kontrat tabelası yenilendi (${cost} oren): ${ids.map(id => monById(id).name).join(', ')}.`, `${REGIONS[r].name} contract board refreshed (${cost} crowns): ${ids.map(id => monById(id).name).join(', ')}.`));
     return ok();
   }
+  /* kesilen canavarın ilanı panoda "öldü" olarak kalır; panodaki bütün ilanlar kesilince pano yenilenir (hafta başını beklemeden).
+   * Bölgede kesilmemiş canavar kalmadıysa pano olduğu gibi kalır. */
+  function refillBoard(r) {
+    const board = state.boards?.[r]; if (!board || postGame() || !board.ids.length) return;
+    const killed = killedSet();
+    if (!board.ids.every(id => killed.has(id))) return;
+    const pool = MONSTERS.filter(m => (m.region || 0) === r && !m.boss && !killed.has(m.id) && m.id !== state.contract?.id);
+    if (!pool.length) return;
+    const ids = [];
+    while (ids.length < BOARD_SIZE && pool.length) ids.push(pool.splice(Math.floor(random() * pool.length), 1)[0].id);
+    board.ids = ids;
+    log(L(`${REGIONS[r].name} panosundaki bütün ilanlar tamamlandı; panoya yeni ilanlar asıldı.`, `Every notice on the ${REGIONS[r].name} board is done; new notices were posted.`), 'good');
+  }
   function boardEntries(r = homeRegion()) {
     if (!REGIONS[r] || REGIONS[r].tier > band()) return [];
-    const board = ensureBoard(r), killed = killedSet();
+    ensureBoard(r); refillBoard(r);
+    const board = state.boards[r], killed = killedSet();
     const list = board.ids.map(monById).map(m => { const el = isElite(m.id); return { m, elite: el, stats: monStats(m, el), killed: killed.has(m.id) && !el, active: state.contract?.id === m.id }; });
     if (bossAvailable(r)) { const b = monById(REGIONS[r].boss), el = isElite(b.id); list.push({ m: b, elite: el, stats: monStats(b, el), boss: true, killed: false, active: state.contract?.id === b.id }); }
     return list;
@@ -863,49 +1081,104 @@ function createEngine(state, opts = {}) {
     return null;
   }
   const completeLinks = () => state.links.filter(l => l.cards.length >= LINK_SIZE);
-  const upLevel = id => (state.swords.up || {})[id] || 0;
-  /* kılıcın güncel değeri: taban + güçlendirme + kendi okulunun seti */
-  function swordValue(w) {
-    if (!w) return 0;
-    const own = w.school && w.school === sc();
-    return w.type === 'silver' ? w.bonus + upLevel(w.id) * UPGRADE.silver + (own ? 5 : 0) : w.bonus + upLevel(w.id) * UPGRADE.steel + (own ? 3 : 0);
+  /* bağın değeri: nadirlik + ek ortak türler, okul uyumu ×1,5 */
+  function linkValue(l) {
+    if (!l || l.cards.length < LINK_SIZE) return null;
+    const cards = l.cards.map(a => CARD_BY_ART[a]).filter(Boolean);
+    const rar = cards.reduce((t, c) => t + (LINK_RAR[c.r] || 0), 0);
+    const shared = cards.length ? cardCats(cards[0]).filter(x => x !== l.cat && cards.every(c => cardCats(c).includes(x))) : [];
+    const fav = (SCHOOL_CATS[sc()] || []).includes(l.cat);
+    const base = rar + shared.length * LINK_EXTRA;
+    return { rar: +rar.toFixed(1), shared, extra: shared.length * LINK_EXTRA, fav, total: +(base * (fav ? LINK_SCHOOL : 1)).toFixed(1) };
   }
-  const baneOf = (w, m) => (w && m && w.bane === m.cls ? BANE : 0);
+  /* sayılan bağlar: en değerli LINK_MAX tanesi */
+  const countedLinks = () => completeLinks().map(l => ({ l, v: linkValue(l) })).sort((a, b) => b.v.total - a.v.total).slice(0, LINK_MAX);
+  const swordLv = id => (state.swords.lv || {})[id] || 1;
+  /* gümüşün saatlik hasarı (kılıcın seviyesi + kendi okulunun seti +%15) */
+  function swordDmg(w, L = w && swordLv(w.id)) {
+    if (!w || w.type !== 'silver') return 0;
+    const own = w.school && w.school === sc();
+    return Math.round(swordDmgAt(w, L) * (own ? 1.15 : 1) * 10) / 10;
+  }
+  /* kılıcın tek sayılık değeri: gümüşte saatlik hasar, çelikte kritik % */
+  function swordValue(w, L = w && swordLv(w.id)) {
+    if (!w) return 0;
+    if (w.type === 'silver') return swordDmg(w, L);
+    const own = w.school && w.school === sc();
+    return swordCritAt(w, L) + (own ? 3 : 0);
+  }
+  const baneOf = (w, m) => (w && m && (w.banes || [w.bane]).includes(m.cls) ? (w.banePct ?? BANE) : 0);
   /* zincirlerin hasar katkısı: en güçlüsü tam, ikincisi yarım, üçüncüsü üçte bir ... */
   function chainDamage() {
-    const list = state.habits.map(h => ({ h, dmg: TIERS[tierOf(h.chain.len)].dmg })).sort((a, b) => b.dmg - a.dmg);
+    const list = state.habits.map(h => ({ h, dmg: TIERS[tierOf(h.chain.len)].dmg * (h.status === 'mastery' ? MASTERY_DMG : 1) })).sort((a, b) => b.dmg - a.dmg);
     list.forEach((x, i) => { x.w = CHAIN_WEIGHTS[i] ?? 0.2; x.eff = +(x.dmg * x.w).toFixed(1); });
     return { total: +list.reduce((s, x) => s + x.eff, 0).toFixed(1), list };
   }
+  /* yüzde bonusları: zincir + kart bağları + bane, düz toplanır. Kılıç tabanı ayrı. */
   function damageBonus(m = state.contract ? monById(state.contract.id) : null) {
     const parts = []; let raw = 0;
-    const sv = swordById(state.swords.silver), stl0 = swordById(state.swords.steel);
-    if (sv) { const b = swordValue(sv); raw += b; parts.push(`${sv.name}${upLevel(sv.id) ? ' +' + upLevel(sv.id) : ''} ${L(`+%${b}`, `+${b}%`)}`); }
-    for (const w of [sv, stl0]) { const bb = baneOf(w, m); if (bb) { raw += bb; parts.push(L(`${w.name}: ${CLASSES[m.cls]?.tr || m.cls} avcısı +%${bb}`, `${w.name}: ${CLASSES[m.cls]?.tr || m.cls} bane +${bb}%`)); } }
-    const ch = chainDamage();
-    if (ch.total) { raw += ch.total; parts.push(L(`zincirler +%${ch.total}`, `chains +${ch.total}%`)); }
-    const nl = Math.min(LINK_MAX, completeLinks().length);
-    if (nl) { raw += nl * LINK_BONUS; parts.push(L(`${nl} kart bağı +%${nl * LINK_BONUS}`, `${nl} card links +${nl * LINK_BONUS}%`)); }
-    const stl = swordById(state.swords.steel);
-    return { pct: effectiveBonus(raw), raw, parts, crit: swordValue(stl) };
+    const sv = swordById(state.swords.silver), stl = swordById(state.swords.steel);
+    for (const w of [sv, stl]) { const bb = baneOf(w, m); if (bb) { raw += bb; parts.push(L(`${w.name}: ${CLASSES[m.cls]?.tr || m.cls} avcısı +%${bb}`, `${w.name}: ${CLASSES[m.cls]?.tr || m.cls} bane +${bb}%`)); } }
+    const cl = countedLinks(), lv = +(cl.reduce((t, x) => t + x.v.total, 0) * (has('linkmaster') ? 1.3 : 1)).toFixed(1);
+    if (lv) { raw += lv; parts.push(L(`${cl.length} kart bağı +%${lv}`, `${cl.length} card links +${lv}%`)); }
+    const ch = chainDamage(), sw = swordDmg(sv), chT = +(ch.total * (has('resonance') ? 1.25 : 1)).toFixed(1);
+    if (chT) { raw += chT; parts.unshift(L(`zincirler +%${chT}`, `chains +${chT}%`)); }
+    for (const [p, nm] of traitBonus(m)) { raw += p; parts.push(`${nm} +${L('%' + p, p + '%')}`); }
+    return { pct: +raw.toFixed(1), raw: +raw.toFixed(1), parts, crit: critChance(m, swordValue(stl)), chain: chT, links: lv, sword: sw, swordName: sv ? `${sv.name} (${L('Sv', 'Lv')} ${swordLv(sv.id)})` : null };
   }
-  /* oyuncunun hasar/saat değeri: seviye × (1 + bonus) × ceza */
+  /* benzersiz özelliklerden gelen hasar yüzdeleri: [yüzde, ad] */
+  function traitBonus(m, t = clockNow()) {
+    const out = [], c = state.contract, ratio = c ? c.hp / c.max : 1, h = hourAt(t), wd = t.getDay();
+    const add = (id, p) => { if (p > 0) out.push([p, uName(id)]); };
+    if (!eqSwords().some(w => w.unique)) return out;
+    if (has('night') && isNight(t)) add('night', 30);
+    if (has('dawn') && h >= 6 && h < 12) add('dawn', 25);
+    if (has('noon') && h >= 12 && h < 18) add('noon', 25);
+    if (has('dusk') && h >= 18 && h < 22) add('dusk', 35);
+    if (has('weekend') && (wd === 0 || wd === 6)) add('weekend', 25);
+    if (has('monday') && wd === 1) add('monday', 50);
+    if (has('execute') && c && ratio < 0.25) add('execute', 50);
+    if (has('firstblood') && c && ratio > 0.75) add('firstblood', 30);
+    if (has('giant') && m?.boss) add('giant', 30);
+    if (has('elite') && c?.elite) add('elite', 40);
+    if (has('fullpower') && state.hp > maxHp() * 0.9) add('fullpower', 20);
+    if (has('bloodprice')) add('bloodprice', 35);
+    if (has('patient') && c?.since) add('patient', Math.min(40, 5 * Math.floor((t - new Date(c.since)) / 864e5)));
+    if (has('quick') && c?.since && t - new Date(c.since) < 12 * 36e5) add('quick', 50);
+    if (has('streak')) add('streak', Math.min(25, 5 * (state.killStreak || 0)));
+    if (has('loyal')) { const w = holderOf('loyal'), since = state.swords.since?.[w.id] || (markEquip(w.id), state.swords.since[w.id]); add('loyal', Math.min(30, Math.floor((t - new Date(since)) / 864e5))); }
+    if (has('kin')) { const o = otherOf('kin'); if (o && !o.set && o.tier >= 4) add('kin', 15); }
+    if (has('lone') && !otherOf('lone')) add('lone', 35);
+    if (has('bestiary') && m) add('bestiary', Math.min(20, new Set(state.trophies.filter(x => monById(x.id).cls === m.cls).map(x => x.id)).size));
+    if (has('lord') && m && regionTier(m.region) < band()) add('lord', 50);
+    if (has('stranger') && state.bandSince && t - new Date(state.bandSince) < 7 * 864e5) add('stranger', 30);
+    if (has('grudge')) add('grudge', 10 * activeFx(t).filter(e => !EFFECTS[e.kind]?.buff).length);
+    if (has('bleed') && state.bleedUntil && t < new Date(state.bleedUntil)) add('bleed', 25);
+    if (has('rested') && isRest(dk(t))) add('rested', 40);
+    if (aeroOn()) add('aerondight', AERO.per * Math.min(AERO.max, state.aero?.charge || 0));
+    return out;
+  }
+  /* kritik şansı: çelik kılıç + özellikler */
+  function critChance(m, base, t = clockNow()) {
+    const c = state.contract;
+    if (has('lastblow') && c && c.hp / c.max < 0.2) return 100;
+    let x = base + (has('sharp') ? 8 : 0) + (has('nightcrit') && isNight(t) ? 15 : 0);
+    if (has('chaincrit') && state.critChain) x *= 2;
+    return Math.min(100, Math.round(x));
+  }
+  /* oyuncunun saatlik hasarı: (seviye gücü + gümüş kılıç) × (1 + bonus [zincir + bağlar + bane]) × odak × ceza × yaralı */
   function playerStats(m = state.contract ? monById(state.contract.id) : null) {
-    const b = damageBonus(m), deb = debuffPct();
-    return { dph: powerAt(state.level) * (1 + b.pct / 100) * (1 - deb / 100), crit: b.crit, deb, bonus: b };
-  }
-  /* başarı anında birkaç saatlik hasar (alışkanlık / yan görev) */
-  function burst(hours, why) {
-    if (state.combat?.mode === 'recover') return 0;
-    const c = ensureContract(); if (!c) return 0;
-    return hitMonster(Math.max(1, Math.round(playerStats(monById(c.id)).dph * hours)), why);
+    const b = damageBonus(m), deb = debuffPct(), buf = buffPct() * (has('focusmind') ? 1.5 : 1), wounded = isWounded();
+    const mult = (1 + b.pct / 100) * (1 + buf / 100) * (1 - deb / 100) * (wounded ? (has('desperate') ? 1.2 : 1 - WOUNDED.pct / 100) : 1);
+    const lvl = powerAt(state.level);
+    return { dph: (lvl + b.sword) * mult, level: lvl, mult, crit: b.crit, deb, buf, wounded, bonus: b };
   }
   function hitMonster(base, why) {
     const c = ensureContract();
     if (!c || base <= 0) return 0;
     const b = damageBonus(monById(c.id));
     const isCrit = b.crit > 0 && random() * 100 < b.crit;
-    const dmg = Math.max(1, Math.round(base * (isCrit ? CRIT_MULT : 1)));
+    const dmg = Math.max(1, Math.round(base * (isCrit ? critMult() : 1)));
     c.hp = Math.max(0, c.hp - dmg);
     state.stats.dmg += dmg; if (isCrit) state.stats.crits++;
     weekTrack('dmg', dmg); fx(isCrit ? 'crit' : 'hit');
@@ -922,8 +1195,16 @@ function createEngine(state, opts = {}) {
     const tk = clockNow();
     state.trophies.push({ id: m.id, at: dk(tk), days: sinceTs ? Math.max(1, Math.ceil((tk - sinceTs) / 86400000)) : null, hours: sinceTs ? +((tk - sinceTs) / 3600000).toFixed(1) : null });
     state.contract = null;
-    const gold = addGold(s.gold * (sc() === 'cat' ? 1.3 : sc() === 'bear' ? 0.85 : 1));
-    log(L(`${why}: ${dmg} hasarlık${isCrit ? ' kritik' : ''} son darbe! ${el ? 'Elit ' : ''}${m.name} öldü. Ödül: ${gold} oren, ${s.xp} TP.`, `${why}: a ${dmg}-damage${isCrit ? ' critical' : ''} finishing blow! ${el ? 'Elite ' : ''}${m.name} is dead. Reward: ${gold} crowns, ${s.xp} XP.`), 'epic');
+    let gm = sc() === 'cat' ? 1.3 : 1, xm = 1;
+    if (has('bounty')) gm *= 1.25;
+    if (has('greedy')) { gm *= 1.5; xm *= 0.75; }
+    if (has('veteran')) { xm *= 1.4; gm *= 0.8; }
+    if (has('sage')) xm *= 1.2;
+    const gold = addGold(s.gold * gm), xp = Math.round(s.xp * xm), scr = SCRAP_PER_KILL + (has('scav') ? 2 : 0);
+    state.scraps += scr;
+    state.killStreak = (state.killStreak || 0) + 1;
+    log(L(`${why}: ${dmg} hasarlık${isCrit ? ' kritik' : ''} son darbe! ${el ? 'Elit ' : ''}${m.name} öldü. Ödül: ${gold} oren, ${xp} TP, ${scr} kırıntı.`, `${why}: a ${dmg}-damage${isCrit ? ' critical' : ''} finishing blow! ${el ? 'Elite ' : ''}${m.name} is dead. Reward: ${gold} crowns, ${xp} XP, ${scr} scrap.`), 'epic');
+    killTraits(m);
     toast(L(`${m.name} öldürüldü! +${gold} oren`, `${m.name} slain! +${gold} crowns`), 'good');
     // kupa: öldürdüğün canavarın kendi Gwent kartı (fraksiyon odağından bağımsız)
     const tc = CARD_BY_ART[m.art];
@@ -934,7 +1215,7 @@ function createEngine(state, opts = {}) {
     // sadece içinde bulunulan kademenin boss'u bir sonraki kademeyi açar (alt kademedeki boss'lar ek içeriktir)
     if (m.boss && regionTier(m.region) === band()) {
       if (band() < BAND_COUNT - 1) {
-        state.region = band() + 1;
+        state.region = band() + 1; state.bandSince = clockNow().toISOString();
         const bi2 = bandInfo(), names = bi2.regions.map(x => REGIONS[x].name).join(', ');
         log(L(`${m.name} yenildi! Yeni bölgeler açıldı: ${names} (seviye ${bi2.min}–${bi2.max}).`, `${m.name} defeated! New regions unlocked: ${names} (levels ${bi2.min}–${bi2.max}).`), 'epic');
         toast(L(`Yeni bölgeler: ${names}`, `New regions: ${names}`), 'good');
@@ -949,16 +1230,33 @@ function createEngine(state, opts = {}) {
         }
       }
     }
-    gainXp(s.xp);
+    gainXp(xp);
+  }
+  /* öldürmede özellik ganimetleri */
+  function killTraits(m) {
+    const got = (id, what) => log(L(`${uName(id)}: ${what[0]}.`, `${uName(id)}: ${what[1]}.`), 'good');
+    if (has('collector') && random() < 0.25) drawCards(1, 'Common', uName('collector'));
+    if (has('trophy') && m.boss) drawCards(1, 'Legendary', uName('trophy'));
+    if (has('potionhunt') && random() < 0.3 && state.swallow < POTION.cap) { state.swallow++; got('potionhunt', ['bir Swallow buldun', 'you found a Swallow']); }
+    if (has('stormharvest') && random() < 0.2 && (state.thunder || 0) < THUNDER.cap) { state.thunder = (state.thunder || 0) + 1; got('stormharvest', ['bir Thunderbolt buldun', 'you found a Thunderbolt']); }
+    if (has('starharvest') && random() < 0.2 && (state.dancing || 0) < DANCING.cap) { state.dancing = (state.dancing || 0) + 1; got('starharvest', ['bir Dancing Star buldun', 'you found a Dancing Star']); }
+    if (has('harvest')) heal(0.25, 1);
   }
   /* ---------- sürekli av ----------
    * Sen canavara sürekli vurursun; canavar sana SADECE alışkanlıklarında başarısız olduğunda vurur
    * (gecikme: yarım vuruş, kaçırma: tam vuruş). Can kendiliğinden dolmaz; sadece Swallow (iksir) doldurur.
    * Can biterse yenilirsin: canavarın canı tamamen dolar, 6 saat toparlanır ve tam canla dönersin. */
   const cbState = () => (state.combat ||= { t: now().toISOString(), mode: 'fight', until: null, last: {} });
-  const potionHeal = () => POTION.heal(state.level);
-  const potionPrice = () => POTION.price(state.level);
-  const schoolHurt = () => (sc() === 'cat' ? 1.5 : sc() === 'bear' ? 0.6 : 1);
+  const potionHeal = () => (has('swallowmaster') ? 100 : POTION.heal(state.level));
+  const critMult = () => (has('deadly') ? 2 : CRIT_MULT);
+  const honeyMax = () => (has('honeybearer') ? 6 : HONEY_MAX);
+  const alchPrice = p => (sc() === 'manticore' ? Math.round(p * ALCH_DISCOUNT) : p);
+  const potionPrice = () => alchPrice(POTION.price(state.level));
+  const regenIdle = () => (sc() === 'bear' ? REGEN.idleBear : REGEN.idle) * (has('quickrecover') ? 2 : 1);
+  const regenFight = () => (REGEN.fight[sc()] ?? REGEN.fight.wolf) * (has('lifebond') ? 3 : 1);
+  const isWounded = () => cbState().mode !== 'recover' && state.hp < maxHp() * WOUNDED.below;
+  const heal = (rate, h) => { state.hp = Math.min(maxHp(), (state.hp || 0) + maxHp() * rate * h); };
+  const schoolHurt = () => (sc() === 'cat' ? 1.5 : sc() === 'bear' ? 0.6 : 1) * (has('stone') ? 0.75 : 1) * (has('bloodprice') ? 1.25 : 1) * (aeroFull() ? AERO.strike : 1);
   /* başarısızlıkta canavarın vuruşu (kaçırma: tam, gecikme: yarım) */
   function failHit(missed, c = state.contract) {
     const m = c ? monById(c.id) : null;
@@ -979,21 +1277,32 @@ function createEngine(state, opts = {}) {
   /* yenilgi: canavarın canı dolar, 6 saat toparlanırsın */
   function defeat(m, c) {
     const cb = cbState(), t = clockNow();
-    state.hp = 0; cb.mode = 'recover'; cb.until = addMin(t, DEFEAT.hours * 60).toISOString();
+    const hours = 1 / regenIdle();
+    state.hp = 0; cb.mode = 'recover'; cb.until = addMin(t, hours * 60).toISOString();
     if (c) c.hp = c.max;
+    state.killStreak = 0; if (state.aero) { state.aero.charge = 0; state.aero.h = 0; }
+    const lost = has('purse') ? 0 : Math.floor((state.gold || 0) * DEFEAT.gold); state.gold -= lost;
     flavor('defeat', m); fx('bad'); state.stats.defeats = (state.stats.defeats || 0) + 1;
-    toast(L(`${m ? m.name : 'Canavar'} seni yendi! Canı tamamen doldu; ${DEFEAT.hours} saat toparlanacaksın.`, `${m ? m.name : 'The monster'} defeated you! It's back to full HP; you'll recover for ${DEFEAT.hours} hours.`), 'bad');
+    if (lost) log(L(`Yaraların sarılırken kesenden ${lost} oren eksildi.`, `While your wounds were tended, ${lost} crowns went missing from your purse.`), 'bad');
+    toast(L(`${m ? m.name : 'Canavar'} seni yendi! Canı tamamen doldu; ~${Math.round(hours * 10) / 10} saat toparlanacaksın${lost ? `, −${lost} oren` : ''}.`, `${m ? m.name : 'The monster'} defeated you! It's back to full HP; you'll recover for ~${Math.round(hours * 10) / 10} hours${lost ? `, −${lost} crowns` : ''}.`), 'bad');
   }
   /* başarısızlık: canavar vurur. Döndürür: geri alma için bilgi */
   function monsterStrike(missed, why) {
     const c = state.contract, m = c ? monById(c.id) : null;
     const before = { hp: state.hp, contract: c ? { ...c } : null, combat: { ...cbState() } };
     if (cbState().mode === 'recover') return { dealt: 0, before };
+    if (!missed && has('steady')) { log(L(`${uName('steady')}: geç kaldın ama canavar vuramadı.`, `${uName('steady')}: you were late, but the monster couldn't strike.`), ''); return { dealt: 0, before }; }
     const d = failHit(missed, c);
     state.hp -= d;
     flavor(missed ? 'strikeMiss' : 'strikeLate', m, d);
-    const died = state.hp <= 0;
+    let died = state.hp <= 0;
+    const wk = mondayOf(logicalToday());
+    if (died && has('lastbreath') && state.lastBreath !== wk) {
+      state.hp = 1; state.lastBreath = wk; died = false;
+      log(L(`${uName('lastbreath')}: ölümcül darbeden 1 canla kurtuldun!`, `${uName('lastbreath')}: you survived a killing blow with 1 HP!`), 'epic');
+    }
     if (died) defeat(m, c);
+    else if (has('thorns') && c && state.contract === c) hitMonster(Math.round(playerStats(m).dph * 3), uName('thorns'));
     return { dealt: d, died, before };
   }
   /* elle iksir: savaş panelindeki düğme */
@@ -1007,6 +1316,31 @@ function createEngine(state, opts = {}) {
     log(L(`Bir Swallow içtin: +${potionHeal()} can (${Math.round(state.hp)}/${maxHp()}).`, `You drank a Swallow: +${potionHeal()} HP (${Math.round(state.hp)}/${maxHp()}).`), 'good');
     return ok();
   }
+  /* Thunderbolt: 12 saat hasar +%20 (içilirken süre yenilenir, üst üste binmez) */
+  function drinkThunder() {
+    if ((state.thunder || 0) <= 0) return err(L('Thunderbolt yok.', 'No Thunderbolt left.'));
+    advanceCombat(now());
+    state.thunder--; state.stats.potions = (state.stats.potions || 0) + 1;
+    addEffect('thunder', L('iksir', 'potion'), has('stormcaller') ? 24 : undefined);
+    return ok();
+  }
+  /* Dancing Star: canavara rastgele 3–10 saatlik hasar (Manticore ×1,3), karşılığında canın %50'si gider. Canın %50'nin üstündeyken atılır.
+   * dancingDmg: bir saatlik bomba hasarı (okul çarpanı dahil). */
+  const dancingDmg = () => { const c = state.contract; return c ? Math.round(playerStats(monById(c.id)).dph * (sc() === 'manticore' ? DANCING.manticore : 1) * (has('bomber') ? 1.5 : 1)) : 0; };
+  const dancingCostPct = () => (has('fireproof') ? 0.25 : DANCING.hpCost);
+  function throwDancing() {
+    if ((state.dancing || 0) <= 0) return err(L('Dancing Star yok.', 'No Dancing Star left.'));
+    if (cbState().mode === 'recover') return err(L('Toparlanıyorsun; bomba atamazsın.', "You're recovering; you can't throw bombs."));
+    advanceCombat(now());
+    if (!ensureContract()) return err(L('Aktif kontrat yok.', 'No active contract.'));
+    const cost = maxHp() * dancingCostPct();
+    if (state.hp <= cost) return err(L(`Canın %${dancingCostPct() * 100}'nin üstünde olmalı.`, `Your HP must be above ${dancingCostPct() * 100}%.`));
+    const hours = DANCING.minH + Math.floor(random() * (DANCING.maxH - DANCING.minH + 1)), d = Math.round(dancingDmg() * hours);
+    state.dancing--; state.hp -= cost; state.stats.bombs = (state.stats.bombs || 0) + 1;
+    log(L(`Dancing Star patladı (${hours} saatlik hasar); alevler seni de yaladı (−${Math.round(cost)} can).`, `The Dancing Star exploded (${hours} hours of damage); the flames licked you too (−${Math.round(cost)} HP).`), 'bad');
+    hitMonster(d, 'Dancing Star');
+    return ok();
+  }
   /* avı 'to' anına kadar ilerlet. Döndürür: özet (öldürülen canavar, kazanılan oren/TP) */
   function advanceCombat(to = now()) {
     if (!idle) return null;
@@ -1018,29 +1352,43 @@ function createEngine(state, opts = {}) {
     const g0 = state.stats.goldEarned, lv0 = state.level, xp0 = state.xp;
     flavorBudget = 40;
     if (cb.mode === 'rest') cb.mode = 'fight';                             // eski kayıt: dinlenme kalktı
-    while (t < to) {
-      const dt = Math.min(STEP_MIN, (to - t) / 60000), h = dt / 60;
-      t = new Date(t.getTime() + dt * 60000); logClock = t;
+    // saat başı vuruş: bir sonraki tam saate gelindiyse o saatin hasarı vurulur (yarım kalan saat sonraki açılışta işlenir)
+    const nextHour = x => { const d = new Date(x); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); return d; };
+    let last = t;
+    while (nextHour(last) <= to) {
+      const hit = nextHour(last), h = (hit - last) / 3600000;
+      last = hit; logClock = hit;
       if (cb.mode === 'recover') {
-        if (t >= new Date(cb.until)) { cb.mode = 'fight'; cb.until = null; state.hp = maxHp(); flavor('recover'); sum.major = true; }
+        heal(regenIdle(), h);
+        if (state.hp >= maxHp() || hit >= new Date(cb.until)) { cb.mode = 'fight'; cb.until = null; state.hp = maxHp(); flavor('recover'); sum.major = true; }
         continue;
       }
       const c = ensureContract();
-      if (!c) continue;
+      if (!c) continue;                                                   // kontrat her zaman vardır; bulunamazsa (bütün panolar boş) av bekler
+      heal(regenFight(), h);
+      if (state.hp > maxHp()) state.hp = maxHp();
       const m = monById(c.id), ps = playerStats(m);
       if (!c.started) { c.started = true; flavor('start', m); }
-      // kritik: seyrek ama büyük bir an; ortalama katkısı "%crit şansla ×1.5" ile aynı
-      const sf = dt / STEP_MIN;
-      let pd = ps.dph * h * (0.85 + random() * 0.3);
-      const crit = ps.crit > 0 && random() < ps.crit / 100 * CRIT_EVENT * sf;
-      if (crit) { pd += ps.dph * (CRIT_MULT - 1) / (12 * CRIT_EVENT); state.stats.crits++; }
+      // sabit vuruş: (seviye gücü + gümüş kılıç) × bonuslar; tek şans unsuru çelik kılıcın kritiği (×1.5)
+      let pd = ps.dph * h;
+      if (aeroFull()) {
+        state.aero.n = (state.aero.n || 0) + 1;
+        if (state.aero.n % AERO.every === 0) { pd = ps.dph * AERO.burst; log(L(`✨ Göl Hanımı'nın Darbesi! Aerondight parladı ve ${m.name} ${AERO.burst} saatlik hasar aldı.`, `✨ Strike of the Lady of the Lake! Aerondight blazed and ${m.name} took ${AERO.burst} hours of damage.`), 'epic'); }
+      }
+      const crit = ps.crit > 0 && random() < ps.crit / 100;
+      state.critChain = crit;
+      if (crit) { pd *= critMult(); state.stats.crits++; if (has('bleed')) state.bleedUntil = addMin(hit, 180).toISOString(); }
+      if (has('leech')) heal(0.007, 1);
+      if (aeroOn()) { state.aero ||= { charge: 0, n: 0, h: 0 }; if (state.aero.charge < AERO.max && ++state.aero.h >= AERO.hours && (state.aero.h = 0, ++state.aero.charge === AERO.max)) log(L('Aerondight tam şarj oldu: Göl Hanımı seni kutsuyor.', 'Aerondight is fully charged: the Lady of the Lake blesses you.'), 'epic'); }
       c.hp -= pd; state.stats.dmg += pd; sum.dmg += pd; weekTrack('dmg', Math.round(pd));
+      c.lastHit = { t: hit.toISOString(), d: Math.round(pd), crit };
       if (crit) flavor('crit', m, Math.max(1, Math.round(pd)));
-      else if (random() < 0.03 * sf) flavor('dodge', m);
+      else if (random() < 0.15) flavor('dodge', m);
       if (c.hp <= 0) { c.hp = 0; killMonster(m, Math.round(pd), crit, L('Av', 'Hunt')); sum.kills++; sum.major = true; }
     }
+    t = last;
     logClock = null;
-    cb.t = to.toISOString();
+    cb.t = t.toISOString();
     expireEffects(to);
     sum.defeats = 0;
     Object.assign(sum, { gold: state.stats.goldEarned - g0, xp: state.level > lv0 ? null : state.xp - xp0, levels: state.level - lv0 });
@@ -1054,7 +1402,8 @@ function createEngine(state, opts = {}) {
     const eta = c && ps.dph > 0 ? c.hp / ps.dph : null;
     return { mode: cb.mode === 'rest' ? 'fight' : cb.mode, until: cb.until, dph: Math.round(ps.dph), crit: ps.crit, deb: ps.deb,
       hitLate: failHit(false, c), hitMiss: failHit(true, c),
-      eta, potions: state.swallow, potionCap: POTION.cap, potionHeal: potionHeal(), potionPrice: potionPrice(), honey: state.honey || 0,
+      eta, wounded: isWounded(), regen: { fight: regenFight(), idle: regenIdle() }, potions: state.swallow, potionCap: POTION.cap, potionHeal: potionHeal(), potionPrice: potionPrice(), honey: state.honey || 0,
+      thunder: state.thunder || 0, thunderCap: THUNDER.cap, thunderPrice: alchPrice(THUNDER.price), dancing: state.dancing || 0, dancingCap: DANCING.cap, dancingPrice: DANCING.price, dancingDmg: dancingDmg(), dancingMin: dancingDmg() * DANCING.minH, dancingMax: dancingDmg() * DANCING.maxH, dancingCost: Math.round(maxHp() * dancingCostPct()), aero: aeroOn() ? { charge: Math.min(AERO.max, state.aero?.charge || 0), max: AERO.max, toNext: (state.aero?.charge || 0) >= AERO.max ? null : AERO.hours - (state.aero?.h || 0), full: aeroFull(), next: aeroFull() ? AERO.every - ((state.aero?.n || 0) % AERO.every) : null, pct: AERO.per * Math.min(AERO.max, state.aero?.charge || 0) } : null,
       effects: (state.effects || []).filter(e => new Date(e.until) > now()) };
   }
 
@@ -1123,9 +1472,8 @@ function createEngine(state, opts = {}) {
     day.medOnTime = n <= w.prepEnd;
     if (day.medOnTime) {
       addGold(DAY_GOLD.prep); gainXp(DAY_XP.prep);
-      log(L(`Yatış aralığında meditasyona çekildin (${hm(n)}). +${DAY_XP.prep} TP, +${DAY_GOLD.prep} oren. Sabah ödülün ×${sc() === 'griffin' ? 1.8 : 1.5} ve +1 kart.`, `You meditated within your bedtime window (${hm(n)}). +${DAY_XP.prep} XP, +${DAY_GOLD.prep} crowns. Morning reward ×${sc() === 'griffin' ? 1.8 : 1.5} and +1 card.`), 'good');
+      log(L(`Yatış aralığında meditasyona çekildin (${hm(n)}). +${DAY_XP.prep} TP, +${DAY_GOLD.prep} oren. Sabah ödülün ×1.5 ve +1 kart.`, `You meditated within your bedtime window (${hm(n)}). +${DAY_XP.prep} XP, +${DAY_GOLD.prep} crowns. Morning reward ×1.5 and +1 card.`), 'good');
       fx('prep');
-      burst(BURST.prep, L('Zamanında yattın', 'You went to bed on time'));
       toast(L('Madalyon sustu. İyi uykular, witcher.', 'The medallion is still. Sleep well, witcher.'), 'good');
     } else {
       log(L(`Aralık dışında meditasyon (${hm(n)}). Sabah ödülün yine de ×1.15.`, `Meditation outside the window (${hm(n)}). Morning reward still ×1.15.`), '');
@@ -1133,14 +1481,15 @@ function createEngine(state, opts = {}) {
     }
     return ok();
   }
+  /* erken tamamlama (Viper): saatli türlerde aralığın ilk 10 dakikası ya da öncesi, adet/yaptım türlerinde öğleden önce */
+  const isEarly = (k, n) => (Q().type === 'count' || Q().type === 'check') ? n < at(k, '12:00') : n <= addMin(W(k).checkStart, 10);
   function rewardMult(day, n, k) {
     let mult = 1; const parts = [];
-    if (day.med) { const m = day.medOnTime ? (sc() === 'griffin' ? 1.8 : 1.5) : 1.15; mult *= m; parts.push(L(`meditasyon ×${m}`, `meditation ×${m}`)); }
+    if (day.med) { const m = day.medOnTime ? 1.5 : 1.15; mult *= m; parts.push(L(`meditasyon ×${m}`, `meditation ×${m}`)); }
     const tier = TIERS[tierOf(C().len)];
     if (tier.mult > 1) { mult *= tier.mult; parts.push(L(`${tier.name} zincir ×${tier.mult}`, `${tier.name} chain ×${tier.mult}`)); }
     if (sc() === 'wolf' && C().len > 0) { const m = +(1 + Math.min(10, C().len) * 0.05).toFixed(2); mult *= m; parts.push(L(`kurt ×${m}`, `wolf ×${m}`)); }
-    if (sc() === 'viper' && n && n <= addMin(W(k).checkStart, 10)) { mult *= 1.4; parts.push(L('engerek dakikliği ×1.4', 'viper punctuality ×1.4')); }
-    if (sc() === 'bear') { mult *= 0.85; parts.push(L('ayı ×0.85', 'bear ×0.85')); }
+    if (sc() === 'viper' && n && isEarly(k, n)) { mult *= 1.4; parts.push(L('engerek dakikliği ×1.4', 'viper punctuality ×1.4')); }
     if (Q().status === 'mastery') { mult *= MASTERY_MULT; parts.push(L(`ustalık ×${MASTERY_MULT}`, `mastery ×${MASTERY_MULT}`)); }
     return { mult, parts };
   }
@@ -1166,7 +1515,8 @@ function createEngine(state, opts = {}) {
       state.cardDay.n++;
       drawCards(nCards, 'Common', `${q0.name}: ${isSleep() ? L('sabah ganimeti', 'morning loot') : L('günün ganimeti', "today's loot")}`);
       chainSuccess(k);
-      burst(BURST.habit, isSleep() ? L('Zamanında kalktın', 'You woke up on time') : L(`"${q0.name}" tamamlandı`, `"${q0.name}" done`));
+      if (sc() === 'viper' && isEarly(k, n)) addEffect('focus', L('erken tamamlandı', 'done early'));
+      successTraits(k, n);
       gainXp(xp);
       const q = Q();
       if (q.status === 'active') { q.progress++; if (q.progress >= q.days) completeQuest(k); }
@@ -1178,20 +1528,38 @@ function createEngine(state, opts = {}) {
       day.result = 'late'; fx('bad');
       log(L(`${sfx(hm(n), 'da')} ${verb}, ama aralık bitmişti (${hm(w.checkEnd)}). +${DAY_XP.late} TP, kart yok.`, `You ${verbEn} at ${hm(n)}, but the window had ended (${hm(w.checkEnd)}). +${DAY_XP.late} XP, no cards.`), 'bad');
       chainLate(k);
-      addEffect('tired', Q().name);
-      monsterStrike(false);
+      if (sc() !== 'griffin' && !has('tireless')) addEffect('tired', Q().name);
+      monsterStrike(false); aeroFail(false);
       gainXp(DAY_XP.late);
     }
     return ok();
   }
+  /* alışkanlık başarısında kılıç özellikleri */
+  function successTraits(k, n) {
+    if (has('early') && isEarly(k, n)) addEffect('early', L('erken tamamlandı', 'done early'));
+    if (has('cardluck') && random() < 0.15) drawCards(1, 'Common', uName('cardluck'));
+    if (has('goldwind')) { const g = addGold(15); log(L(`${uName('goldwind')}: +${g} oren.`, `${uName('goldwind')}: +${g} crowns.`), 'good'); }
+    if (has('discipline') && state.habits.every(h => h.entries[k]?.result === 'success')) {
+      const end = at(addDays(dk(clockNow()), 2), '00:00');
+      addEffect('discipline', L('günün bütün alışkanlıkları', "all of the day's habits"), Math.max(1, (end - clockNow()) / 36e5));
+    }
+  }
+  /* Aerondight: gecikme şarjın yarısını, kaçırma hepsini götürür */
+  function aeroFail(missed) {
+    if (!state.aero?.charge) return;
+    const before = state.aero.charge;
+    state.aero.charge = missed ? 0 : Math.floor(before / 2); state.aero.n = 0; state.aero.h = 0;
+    if (aeroOn()) log(L(`Aerondight sönükleşti: şarj ${before} → ${state.aero.charge}.`, `Aerondight dimmed: charge ${before} → ${state.aero.charge}.`), 'bad');
+  }
   function applyMissed(k) {
     const day = getDay(k);
     day.q ||= Q().id;
-    if (Q().type === 'count' && (day.count || 0) >= Q().count.target / 2 && !isRest(k)) {
+    const half = Q().type === 'count' ? (day.count || 0) >= Q().count.target / 2 : (Q().items?.length && doneItems(day).length >= Q().items.length / 2);
+    if (half && !isRest(k)) {
       // adet hedefinin en az yarısı: gecikme gibi sayılır
       day.result = 'late'; fx('bad');
       log(L(`"${Q().name}": ${longDate(k)} hedefin yarısına ulaştın (${day.count}/${Q().count.target}). Paslı halka, kart yok.`, `"${Q().name}": on ${longDate(k)} you reached half the target (${day.count}/${Q().count.target}). Rusty link, no cards.`), 'bad');
-      chainLate(k); addEffect('tired', Q().name); monsterStrike(false); gainXp(DAY_XP.late);
+      chainLate(k); if (sc() !== 'griffin' && !has('tireless')) addEffect('tired', Q().name); monsterStrike(false); aeroFail(false); gainXp(DAY_XP.late);
       return;
     }
     if (isRest(k)) {
@@ -1201,16 +1569,18 @@ function createEngine(state, opts = {}) {
     }
     day.result = 'fail';
     // sonradan işlenirse geri alınabilsin diye kaçırmanın etkileri kaydedilir
-    const undo = { chain: JSON.parse(JSON.stringify(C())), honeyUsed: false, effect: null, strike: null };
+    const undo = { chain: JSON.parse(JSON.stringify(C())), honeyUsed: false, effect: null, strike: null, aero: state.aero ? { ...state.aero } : null };
+    const exhaustH = has('resolute') ? 8 : aeroFull() ? AERO.exhausted : undefined;
     log(L(`"${Q().name}": ${longDate(k)} kaçırıldı.`, `"${Q().name}": ${longDate(k)} was missed.`), 'bad');
     chainBreak(k, L('kaçırılan gün', 'missed day'));
     if ((state.honey || 0) > 0) {
       state.honey--; undo.honeyUsed = true;
       log(L('White Honey işe yaradı: canavar vuramadı, Bitkin olmadın.', "White Honey worked: the monster couldn't strike and you didn't become Exhausted."), '');
     } else {
-      undo.effect = addEffect('exhausted', Q().name);
+      if (sc() !== 'griffin') undo.effect = addEffect('exhausted', Q().name, exhaustH);
       undo.strike = monsterStrike(true).before;
     }
+    aeroFail(true);
     day.undo = undo;
   }
 
@@ -1249,6 +1619,7 @@ function createEngine(state, opts = {}) {
     const day = Q().entries[k], u = day.undo;
     Q().chain = u.chain;
     if (u.honeyUsed) state.honey = (state.honey || 0) + 1;
+    if (u.aero) state.aero = u.aero;
     if (u.effect) state.effects = state.effects.filter(e => e.id !== u.effect);
     if (u.strike) {                                            // canavarın vuruşunu (ve yenilgiyi) geri al
       state.hp = Math.min(maxHp(), u.strike.hp);
@@ -1360,6 +1731,22 @@ function createEngine(state, opts = {}) {
     if (day.count >= goal) { advanceCombat(now()); return doCheck(k, t); }
     return ok();
   }
+  /* alt görevi işaretle / kaldır. Adette sayılır; hepsi (ya da hedef) tamamlanınca gün başarılı olur. */
+  const doneItems = day => (day.done || []).filter(x => (Q().items || []).includes(x));
+  function toggleItem(name) {
+    const q = Q();
+    if (!q.items?.includes(name)) return err(L('Böyle bir alt görev yok.', 'No such sub-task.'));
+    const t = now(), k = upcoming(t), day = getDay(k), w = W(k);
+    if (day.result) return err(L('Bu günün sonucu zaten belli.', "This day's result is already set."));
+    if (t < w.checkOpen) return err(L('Henüz açık değil.', 'Not open yet.'));
+    day.done ||= [];
+    day.done = day.done.includes(name) ? day.done.filter(x => x !== name) : [...day.done, name];
+    day.q = q.id;
+    const n = doneItems(day).length;
+    if (q.type === 'count') { day.count = n; if (n >= q.count.target) { advanceCombat(now()); return doCheck(k, t); } }
+    else if (n >= q.items.length) { advanceCombat(now()); return doCheck(k, t); }
+    return ok();
+  }
   function continueMastery() {
     const q = Q();
     if (q.status !== 'mastery') return err(L('Görev henüz tamamlanmadı.', 'The quest is not complete yet.'));
@@ -1377,7 +1764,6 @@ function createEngine(state, opts = {}) {
     advanceCombat(now());
     done.push(id); addGold(+q.gold); gainXp(+q.xp);
     log(L(`Yan görev tamamlandı: ${q.name}. +${q.xp} TP, +${q.gold} oren.`, `Side quest done: ${q.name}. +${q.xp} XP, +${q.gold} crowns.`), 'good');
-    burst(BURST.side, L(`Yan görev (${q.name})`, `Side quest (${q.name})`));
     return ok();
   }
   function addSide(name, xp, gold) {
@@ -1388,7 +1774,9 @@ function createEngine(state, opts = {}) {
   }
   function removeSide(id) { state.quests = state.quests.filter(q => q.id !== id); return ok(); }
   function shopItems() {
-    return SHOP.map(i => ({ ...i, price: i.id === 'swallow' ? potionPrice() : i.price, disabled: (i.id === 'swallow' && state.swallow >= POTION.cap) || (i.id === 'honey' && (state.honey || 0) >= HONEY_MAX) }));
+    const full = { swallow: state.swallow >= POTION.cap, honey: (state.honey || 0) >= honeyMax(), thunder: (state.thunder || 0) >= THUNDER.cap, dancing: (state.dancing || 0) >= DANCING.cap,
+      owl: atCap() && state.level < MAX_LEVEL && state.xp >= xpBank() };   // seviye sınırında TP dolduysa Tawny Owl boşa gider
+    return SHOP.map(i => ({ ...i, price: i.id === 'swallow' ? potionPrice() : ALCHEMY.includes(i.id) ? alchPrice(i.price) : i.price, disabled: !!full[i.id] }));
   }
   function buy(id) {
     const it = shopItems().find(i => i.id === id);
@@ -1399,7 +1787,10 @@ function createEngine(state, opts = {}) {
     if (id === 'keg') drawCards(3, 'Rare', it.name);
     if (id === 'bigkeg') drawCards(5, 'Epic', it.name);
     if (id === 'swallow') { state.swallow++; log(L(`Swallow aldın (${state.swallow}/${POTION.cap}).`, `You bought a Swallow (${state.swallow}/${POTION.cap}).`)); }
-    if (id === 'honey') { state.honey = (state.honey || 0) + 1; log(L(`White Honey aldın (${state.honey}/${HONEY_MAX}).`, `You bought White Honey (${state.honey}/${HONEY_MAX}).`)); }
+    if (id === 'honey') { state.honey = (state.honey || 0) + 1; log(L(`White Honey aldın (${state.honey}/${honeyMax()}).`, `You bought White Honey (${state.honey}/${honeyMax()}).`)); }
+    if (id === 'thunder') { state.thunder = (state.thunder || 0) + 1; log(L(`Thunderbolt aldın (${state.thunder}/${THUNDER.cap}).`, `You bought a Thunderbolt (${state.thunder}/${THUNDER.cap}).`)); }
+    if (id === 'dancing') { state.dancing = (state.dancing || 0) + 1; log(L(`Dancing Star aldın (${state.dancing}/${DANCING.cap}).`, `You bought a Dancing Star (${state.dancing}/${DANCING.cap}).`)); }
+    if (id === 'owl') { log(L(`Bir Tawny Owl içtin: +${OWL.xp} TP.`, `You drank a Tawny Owl: +${OWL.xp} XP.`), 'good'); gainXp(OWL.xp); }
     return ok();
   }
   /* demirci: her gün tür başına 5 kılıç (tarih + karaktere göre sabit, sahip olunanlar hariç) */
@@ -1414,81 +1805,75 @@ function createEngine(state, opts = {}) {
     log(L(`Demirci stoğunu yeniledi (${cost} oren).`, `The blacksmith restocked (${cost} crowns).`));
     return ok();
   }
+  /* bugün (bu stokta) satın alınanlar: yerine yenisi gelmez */
+  const shopKey = (k = dk(now())) => `${k}|${shopRerolls(k)}`;
+  const boughtNow = (k = dk(now())) => (state.shopBought?.key === shopKey(k) ? state.shopBought.ids : []);
   function dailySwords(type, k = dk(now())) {
-    const n = shopRerolls(k);
+    const n = shopRerolls(k), bought = boughtNow(k), ownedBefore = id => state.swords.owned.includes(id) && !bought.includes(id);
     const r = seeded(hashStr(`${k}|${state.charId}|${type}${n ? '|' + n : ''}`));
-    // seviyene göre: 3 kılıç senin kademenden, 1 alt kademeden, 1 üst kademeden (hedef). okul setleri satılmaz (boss şeması).
-    const avail = SWORDS.filter(w => w.type === type && !w.set && !state.swords.owned.includes(w.id));
-    const tiers = [...new Set(SWORDS.filter(w => w.type === type && !w.set).map(w => w.tier))].sort((a, b) => a - b);
-    const myTier = tiers.filter(t => SWORDS.some(w => w.type === type && !w.set && w.tier === t && w.level <= state.level)).pop() || tiers[0];
-    const ti = tiers.indexOf(myTier);
-    const want = [[myTier, 3], [tiers[ti - 1], 1], [tiers[ti + 1], 1]];
-    const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    // her kılıcın kademesi seviyene göre zarla belirlenir (altlarda Sıradan, üstlerde Efsanevi daha olası); okul setleri satılmaz
+    const L = state.level, odds = rarityOdds(L), tiers = Object.keys(odds).map(Number);
+    const pool = SWORDS.filter(w => w.type === type && !w.set && w.tier <= 4 && !ownedBefore(w.id));
     const out = [];
-    for (const [t, n] of want) if (t != null) out.push(...shuffle(avail.filter(w => w.tier === t)).slice(0, n));
-    // bir kademe tükendiyse en yakın kademelerden tamamla
-    const rest = shuffle(avail.filter(w => !out.includes(w))).sort((a, b) => Math.abs(a.tier - myTier) - Math.abs(b.tier - myTier));
-    while (out.length < SHOP_DAILY && rest.length) out.push(rest.shift());
-    return out.slice(0, SHOP_DAILY).sort((a, b) => a.tier - b.tier || a.price - b.price);
+    for (let i = 0; i < SHOP_DAILY && out.length < pool.length; i++) {
+      let x = r() * 100, tier = tiers[tiers.length - 1];
+      for (const t of tiers) { if ((x -= odds[t]) <= 0) { tier = t; break; } }
+      const left = pool.filter(w => !out.includes(w));
+      const same = left.filter(w => w.tier === tier), near = same.length ? same : left.slice().sort((a, b) => Math.abs(a.tier - tier) - Math.abs(b.tier - tier)).filter((w, _, a) => w.tier === a[0].tier);
+      out.push(near[Math.floor(r() * near.length)]);
+    }
+    const aero = SWORDS.find(w => w.tier === 6 && w.type === type);
+    if (aero && L >= AERONDIGHT.minLevel && !ownedBefore(aero.id) && r() < AERONDIGHT.chance) out.push(aero);
+    return out.filter(w => !bought.includes(w.id)).sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
   }
+  /* demircideki fiyat ve güç: kılıç senin şu anki seviyende gelir */
+  const shopPrice = w => Math.round(swordPrice(w, state.level) * (!w.set && w.tier >= 4 ? LEGEND_PRICE : 1) / 5) * 5;   // Efsanevi ve Kadim %50 pahalı
   function buySword(id) {
     const w = swordById(id);
     if (!w) return err(L('Böyle bir kılıç yok.', 'No such sword.'));
     if (w.set) return err(L('Okul setleri satılmaz; boss şemasıyla yapılır.', "School sets aren't sold; they're crafted from boss diagrams."));
     if (state.swords.owned.includes(id)) return err(L('Bu kılıç zaten sende.', 'You already own this sword.'));
     if (!dailySwords(w.type).some(x => x.id === id)) return err(L('Demirci bugün bu kılıcı satmıyor.', "The blacksmith isn't selling this sword today."));
-    if (state.level < w.level) return err(L(`Bu kılıç için en az ${w.level}. seviye olmalısın.`, `You need to be at least level ${w.level} for this sword.`));
-    if (state.gold < w.price) return err(L('Yeterli orenin yok.', "You don't have enough crowns."));
-    state.gold -= w.price; state.swords.owned.push(id);
-    if (!state.swords[w.type]) state.swords[w.type] = id;
-    log(L(`${w.name} satın alındı (${w.price} oren).${state.swords[w.type] === id ? ' Kuşandın.' : ''}`, `Bought ${w.name} (${w.price} crowns).${state.swords[w.type] === id ? ' Equipped.' : ''}`), 'epic');
+    const price = shopPrice(w);
+    if (state.gold < price) return err(L('Yeterli orenin yok.', "You don't have enough crowns."));
+    state.gold -= price; state.swords.owned.push(id);
+    (state.swords.lv ||= {})[id] = state.level;
+    const key = shopKey(); state.shopBought = state.shopBought?.key === key ? { key, ids: [...state.shopBought.ids, id] } : { key, ids: [id] };
+    if (!state.swords[w.type]) { state.swords[w.type] = id; markEquip(id); }
+    log(L(`${w.name} (seviye ${state.level}) satın alındı (${price} oren).${state.swords[w.type] === id ? ' Kuşandın.' : ''}`, `Bought ${w.name} (level ${state.level}) for ${price} crowns.${state.swords[w.type] === id ? ' Equipped.' : ''}`), 'epic');
     return ok();
   }
+  /* kılıcın seviyesini yükselt: en fazla kendi seviyene kadar */
   function upgradeCost(id) {
-    const w = swordById(id), u = upLevel(id);
-    if (!w || u >= UPGRADE.max) return null;
-    return { to: u + 1, gold: Math.round(w.price * UPGRADE.goldMult[u] / 5) * 5, scraps: UPGRADE.scraps[u] };
+    const w = swordById(id), lv = swordLv(id);
+    if (!w || !state.swords.owned.includes(id) || lv >= state.level) return null;
+    const to = lv + 1;
+    return { to, gold: Math.max(5, Math.round(swordPrice(w, to) * SWORD_UP.goldShare / 5) * 5), scraps: SWORD_UP.scraps(to) };
   }
   function upgradeSword(id) {
     const w = swordById(id);
     if (!w || !state.swords.owned.includes(id)) return err(L('Bu kılıç sende değil.', "You don't own this sword."));
     const c = upgradeCost(id);
-    if (!c) return err(L(`Bu kılıç zaten +${UPGRADE.max}.`, `This sword is already +${UPGRADE.max}.`));
+    if (!c) return err(L(`Kılıcın seviyesi senin seviyeni (${state.level}) geçemez.`, `A sword can't go above your level (${state.level}).`));
     if (state.gold < c.gold) return err(L(`${c.gold} oren gerekiyor.`, `You need ${c.gold} crowns.`));
     if (state.scraps < c.scraps) return err(L(`${c.scraps} kırıntı gerekiyor.`, `You need ${c.scraps} scraps.`));
     state.gold -= c.gold; state.scraps -= c.scraps;
-    state.swords.up ||= {}; state.swords.up[id] = c.to;
-    log(L(`${w.name} +${c.to} oldu (${c.gold} oren, ${c.scraps} kırıntı). ${w.type === 'silver' ? `Hasar +%${swordValue(w)}` : `Kritik %${swordValue(w)}`}.`, `${w.name} is now +${c.to} (${c.gold} crowns, ${c.scraps} scraps). ${w.type === 'silver' ? `Damage +${swordValue(w)}%` : `Crit ${swordValue(w)}%`}.`), 'epic');
-    return ok();
-  }
-  function upgradeSpent(id) {
-    const w = swordById(id); let gold = 0, scraps = 0;
-    for (let u = 0; u < upLevel(id); u++) { gold += Math.round(w.price * UPGRADE.goldMult[u] / 5) * 5; scraps += UPGRADE.scraps[u]; }
-    return { gold, scraps };
-  }
-  const transferFee = id => Math.round(swordById(id).price * TRANSFER_FEE / 5) * 5;
-  function transferUpgrades(fromId, toId) {
-    const a = swordById(fromId), b = swordById(toId);
-    if (!a || !b || !state.swords.owned.includes(fromId) || !state.swords.owned.includes(toId)) return err(L('İki kılıç da sende olmalı.', 'You must own both swords.'));
-    if (a.type !== b.type) return err(L('Güçlendirme sadece aynı türdeki (gümüş↔gümüş, çelik↔çelik) kılıca aktarılır.', 'Upgrades only transfer between swords of the same type (silver↔silver, steel↔steel).'));
-    if (upLevel(fromId) <= upLevel(toId)) return err(L('Hedef kılıç zaten en az bu kadar güçlendirilmiş.', 'The target sword is already upgraded at least this much.'));
-    const fee = transferFee(toId);
-    if (state.gold < fee) return err(L(`${fee} oren gerekiyor.`, `You need ${fee} crowns.`));
-    state.gold -= fee;
-    state.swords.up[toId] = upLevel(fromId); state.swords.up[fromId] = 0;
-    log(L(`${a.name} üzerindeki +${state.swords.up[toId]} güçlendirme ${b.name}'a aktarıldı (${fee} oren).`, `Transferred the +${state.swords.up[toId]} upgrade from ${a.name} to ${b.name} (${fee} crowns).`), 'epic');
+    state.swords.lv[id] = c.to;
+    state.counters ||= {}; state.counters.forged = (state.counters.forged || 0) + 1;
+    log(L(`${w.name} ${c.to}. seviyeye yükseltildi (${c.gold} oren, ${c.scraps} kırıntı). ${w.type === 'silver' ? `Hasar +${swordValue(w)}/sa` : `Kritik %${swordValue(w)}`}.`,
+      `${w.name} upgraded to level ${c.to} (${c.gold} crowns, ${c.scraps} scraps). ${w.type === 'silver' ? `Damage +${swordValue(w)}/h` : `Crit ${swordValue(w)}%`}.`), 'epic');
     return ok();
   }
   function dismantleValue(id) {
-    const w = swordById(id), sp = upgradeSpent(id);
-    return { gold: Math.round((w.price + sp.gold) * DISMANTLE.gold), scraps: Math.round(sp.scraps * DISMANTLE.scraps) };
+    const w = swordById(id), lv = swordLv(id);
+    return { gold: Math.round(swordPrice(w, lv) * DISMANTLE.gold), scraps: Math.floor(lv / 2) };
   }
   function dismantleSword(id) {
     const w = swordById(id);
     if (!w || !state.swords.owned.includes(id)) return err(L('Bu kılıç sende değil.', "You don't own this sword."));
     if (state.swords[w.type] === id) return err(L('Kuşandığın kılıcı eritemezsin.', "You can't dismantle an equipped sword."));
     const v = dismantleValue(id);
-    state.swords.owned = state.swords.owned.filter(x => x !== id); delete state.swords.up[id];
+    state.swords.owned = state.swords.owned.filter(x => x !== id); delete state.swords.lv[id];
     state.gold += v.gold; state.scraps += v.scraps;
     log(L(`${w.name} eritildi: +${v.gold} oren, +${v.scraps} kırıntı.`, `${w.name} dismantled: +${v.gold} crowns, +${v.scraps} scraps.`));
     return ok();
@@ -1498,43 +1883,47 @@ function createEngine(state, opts = {}) {
     const have = new Set([...state.swords.owned, ...state.diagrams]);
     const sets = SWORDS.filter(w => w.set && !have.has(w.id));
     if (!sets.length) return null;
-    const mine = sets.filter(w => w.school === sc()).sort((a, b) => (a.type === 'steel' ? 0 : 1) - (b.type === 'steel' ? 0 : 1));
-    const w = mine[0] || rnd(sets);
+    // önce kendi okulunun en düşük aşaması (çelik önce), sonra diğer okulların en düşük aşamaları
+    const order = (a, b) => (a.v ?? 0) - (b.v ?? 0) || (a.type === 'steel' ? 0 : 1) - (b.type === 'steel' ? 0 : 1);
+    const mine = sets.filter(w => w.school === sc()).sort(order);
+    const low = sets.slice().sort(order).filter((w, i, a) => (w.v ?? 0) === (a[0].v ?? 0));
+    const w = mine[0] || rnd(low);
     state.diagrams.push(w.id);
     log(L(`Boss bir şema düşürdü: ${w.name}. Demircide yaptırabilirsin.`, `The boss dropped a diagram: ${w.name}. You can have it crafted at the blacksmith.`), 'epic');
     toast(L(`Şema: ${w.name}`, `Diagram: ${w.name}`), 'good');
     return w;
   }
-  const craftCost = id => ({ gold: swordById(id).price, scraps: SET_CRAFT_SCRAPS });
+  const craftCost = id => ({ gold: swordPrice(swordById(id), state.level), scraps: SET_CRAFT_SCRAPS });
   function craftSword(id) {
     const w = swordById(id);
     if (!w || !state.diagrams.includes(id)) return err(L('Bu kılıcın şeması sende yok.', "You don't have this sword's diagram."));
-    if (state.level < w.level) return err(L(`Bu kılıç için en az ${w.level}. seviye olmalısın.`, `You need to be at least level ${w.level} for this sword.`));
     const c = craftCost(id);
     if (state.gold < c.gold) return err(L(`${c.gold} oren gerekiyor.`, `You need ${c.gold} crowns.`));
     if (state.scraps < c.scraps) return err(L(`${c.scraps} kırıntı gerekiyor.`, `You need ${c.scraps} scraps.`));
     state.gold -= c.gold; state.scraps -= c.scraps;
-    state.diagrams = state.diagrams.filter(x => x !== id); state.swords.owned.push(id);
-    if (!state.swords[w.type]) state.swords[w.type] = id;
-    log(L(`Demirci ${w.name}'ı yaptı (${c.gold} oren, ${c.scraps} kırıntı).`, `The blacksmith crafted ${w.name} (${c.gold} crowns, ${c.scraps} scraps).`), 'epic');
+    state.diagrams = state.diagrams.filter(x => x !== id); state.swords.owned.push(id); (state.swords.lv ||= {})[id] = state.level;
+    if (!state.swords[w.type]) { state.swords[w.type] = id; markEquip(id); }
+    log(L(`Demirci ${w.name}'ı ${state.level}. seviyede yaptı (${c.gold} oren, ${c.scraps} kırıntı).`, `The blacksmith crafted ${w.name} (${c.gold} crowns, ${c.scraps} scraps).`), 'epic');
     return ok();
   }
   /* bir canavara karşı en iyi kılıç: güçlendirme + okul + bane dahil */
   function bestSwordFor(type, m) {
     const owned = state.swords.owned.map(swordById).filter(w => w && w.type === type);
-    const score = w => swordValue(w) * (type === 'steel' ? 0.5 : 1) + baneOf(w, m);
+    // gümüş: ortalama saatlik hasar (avcı bonusu yüzdesiyle), çelik: kritik + avcı yüzdesi
+    const score = w => type === 'silver' ? swordValue(w) + baneOf(w, m) / 100 * (powerAt(state.level) + swordValue(w)) : swordValue(w) * 0.5 + baneOf(w, m);
     return owned.sort((a, b) => score(b) - score(a))[0] || null;
   }
   function equipBest(m = state.contract ? monById(state.contract.id) : null) {
     let changed = false;
-    for (const type of ['silver', 'steel']) { const w = bestSwordFor(type, m); if (w && state.swords[type] !== w.id) { state.swords[type] = w.id; changed = true; } }
+    for (const type of ['silver', 'steel']) { const w = bestSwordFor(type, m); if (w && state.swords[type] !== w.id) { state.swords[type] = w.id; markEquip(w.id); changed = true; } }
     if (changed) log(L('Bu kontrat için en iyi kılıçlar kuşanıldı.', 'Equipped the best swords for this contract.'));
     return ok();
   }
   function equipSword(id) {
     const w = swordById(id);
     if (!w || !state.swords.owned.includes(id)) return err(L('Bu kılıç sende değil.', "You don't own this sword."));
-    state.swords[w.type] = id;
+    if (state.swords[w.type] !== id) markEquip(id);
+    state.swords[w.type] = id; if (state.hp > maxHp()) state.hp = maxHp();
     log(L(`${w.name} kuşanıldı.`, `${w.name} equipped.`));
     return ok();
   }
@@ -1557,13 +1946,16 @@ function createEngine(state, opts = {}) {
       .forEach(c => cardCats(c).forEach(cat => { counts[cat] = (counts[cat] || 0) + 1; }));
     return counts;
   }
-  function eligibleForLink(linkId) {
+  function eligibleForLink(linkId, { includeUsed = false } = {}) {
     const l = state.links.find(x => x.id === linkId); if (!l) return [];
     const used = usedInLinks();
-    return CARDS.filter(c => c.f === l.f && state.collection[c.a] && !used.has(c.a) && cardCats(c).includes(l.cat));
+    return CARDS.filter(c => c.f === l.f && state.collection[c.a] && !l.cards.includes(c.a) && (includeUsed || !used.has(c.a)) && cardCats(c).includes(l.cat));
   }
+  /* kartın bulunduğu bağ (yoksa null) */
+  const linkOfCard = a => state.links.find(l => l.cards.includes(a)) || null;
   function createLink(f, cat) {
     if (!f || !cat) return err(L('Fraksiyon ve tür seç.', 'Pick a faction and a category.'));
+    if (state.links.length >= LINK_MAX) return err(L(`En fazla ${LINK_MAX} bağ kurabilirsin. Yer açmak için bir bağı çöz.`, `You can have at most ${LINK_MAX} links. Undo one to make room.`));
     const l = { id: uid(), f, cat, cards: [] };
     state.links.push(l);
     return { ok: true, link: l };
@@ -1575,12 +1967,17 @@ function createEngine(state, opts = {}) {
     if (!state.collection[a]) return err(L('Bu kart sende yok.', "You don't have this card."));
     if (c.f !== l.f) return err(L('Kart bu fraksiyondan değil.', "The card isn't from this faction."));
     if (!cardCats(c).includes(l.cat)) return err(L(`Kartın türleri arasında "${l.cat}" yok.`, `The card doesn't have the "${l.cat}" category.`));
-    if (usedInLinks().has(a)) return err(L('Bu kart başka bir bağda.', 'This card is in another link.'));
+    if (l.cards.includes(a)) return err(L('Bu kart zaten bu bağda.', 'This card is already in this link.'));
+    const from = linkOfCard(a);
+    if (from) {                                                         // başka bağdaysa oradan çıkarılıp buraya taşınır
+      from.cards = from.cards.filter(x => x !== a);
+      log(L(`${c.n}, ${from.f} · ${from.cat} bağından çıkarılıp ${l.f} · ${l.cat} bağına taşındı.`, `${c.n} moved from the ${from.f} · ${from.cat} link to ${l.f} · ${l.cat}.`));
+    }
     l.cards.push(a);
     if (l.cards.length === LINK_SIZE) {
-      const n = completeLinks().length;
-      log(L(`Kart bağı tamamlandı: ${l.f} · ${l.cat}. ${n <= LINK_MAX ? `Hasar +%${LINK_BONUS}.` : `(En çok ${LINK_MAX} bağ sayılır.)`}`, `Card link complete: ${l.f} · ${l.cat}. ${n <= LINK_MAX ? `Damage +${LINK_BONUS}%.` : `(At most ${LINK_MAX} links count.)`}`), 'epic');
-      toast(L(`Bağ tamamlandı: ${l.cat} (+%${LINK_BONUS} hasar)`, `Link complete: ${l.cat} (+${LINK_BONUS}% damage)`), 'good');
+      const v = linkValue(l), ex = v.shared.length ? ` + ${v.shared.join(', ')}` : '';
+      log(L(`Kart bağı tamamlandı: ${l.f} · ${l.cat}${ex}. Hasar +%${v.total}${v.fav ? ' (okul uyumu ×1,5)' : ''}.`, `Card link complete: ${l.f} · ${l.cat}${ex}. Damage +${v.total}%${v.fav ? ' (school affinity ×1.5)' : ''}.`), 'epic');
+      toast(L(`Bağ tamamlandı: ${l.cat} (+%${v.total} hasar)`, `Link complete: ${l.cat} (+${v.total}% damage)`), 'good');
     }
     return ok();
   }
@@ -1600,12 +1997,32 @@ function createEngine(state, opts = {}) {
     log(L(`Okul değişti: ${SCHOOLS[id].name}.`, `School changed: ${SCHOOLS[id].name}.`), 'epic');
     return ok();
   }
+  /* kart odağı: odaklanılan fraksiyonun bütün kartları toplanınca başka bir fraksiyona geçilebilir (ücretsiz).
+   * Toplanan kartlar koleksiyonda kalır; yeni kartlar yeni fraksiyondan + tarafsızdan gelir. */
+  function factionProgress(f = state.faction) {
+    if (!f) return null;
+    const all = CARDS.filter(c => c.f === f);
+    return { have: all.filter(c => state.collection[c.a]).length, total: all.length };
+  }
+  function changeFaction(f) {
+    if (!state.faction) return err(L('Zaten bütün fraksiyonlardan kart topluyorsun.', 'You already collect cards from all factions.'));
+    if (f === 'all') f = null;
+    if (f !== null && (!FACTIONS.includes(f) || f === state.faction)) return err(L('Başka bir fraksiyon seç.', 'Pick a different faction.'));
+    const p = factionProgress();
+    if (p.have < p.total) return err(L(`Önce ${FACTION_TR[state.faction]} kartlarının hepsini topla (${p.have}/${p.total}).`, `First collect every ${FACTION_TR[state.faction]} card (${p.have}/${p.total}).`));
+    const old = state.faction;
+    state.factionsDone = [...new Set([...(state.factionsDone || []), old])];
+    state.faction = f;
+    log(L(`${FACTION_TR[old]} koleksiyonu tamamlandı. Yeni kart odağı: ${f ? FACTION_TR[f] : 'bütün fraksiyonlar'}.`, `${FACTION_TR[old]} collection complete. New card focus: ${f ? FACTION_TR[f] : 'all factions'}.`), 'epic');
+    toast(L(`Yeni kart odağı: ${f ? FACTION_TR[f] : 'hepsi'}`, `New card focus: ${f ? FACTION_TR[f] : 'all'}`), 'good');
+    return ok();
+  }
   function snapshot() {
     return {
       id: state.charId, name: state.name, school: state.school, faction: state.faction, avatar: state.avatar,
       level: state.level, fame: state.fame || 0, region: state.region, legend: state.legend, start: state.charStart, end: now().toISOString(),
       collection: { ...state.collection }, links: state.links.map(l => ({ ...l, cards: [...l.cards] })),
-      trophies: state.trophies.map(t => ({ ...t })), swords: [...state.swords.owned], swordUps: { ...(state.swords.up || {}) }, diagrams: [...(state.diagrams || [])],
+      trophies: state.trophies.map(t => ({ ...t })), swords: [...state.swords.owned], swordLevels: { ...(state.swords.lv || {}) }, diagrams: [...(state.diagrams || [])],
       draws: state.draws, stats: { ...state.stats }, gold: state.gold,
     };
   }
@@ -1656,17 +2073,22 @@ function createEngine(state, opts = {}) {
     const chars = [...(state.hall || []), { trophies: state.trophies, collection: state.collection, links: state.links, legend: state.legend }];
     const allTrophies = chars.flatMap(c => c.trophies || []);
     const regionCleared = chars.some(c => { const t = new Set((c.trophies || []).map(x => x.id)); return REGIONS.some((r, i) => MONSTERS.filter(m => m.region === i).every(m => t.has(m.id))); });
+    // bölge başına: bir karakterin o bölgede öldürdüğü farklı canavar sayısının en yükseği
+    const regionKills = REGIONS.map((r, i) => Math.max(0, ...chars.map(c => { const t = new Set((c.trophies || []).map(x => x.id)); return MONSTERS.filter(m => m.region === i && t.has(m.id)).length; })));
     return {
       success: allDays.filter(d => d.result === 'success').length, rests: Object.keys(state.restDays || {}).length,
       chainBest: Math.max(0, ...state.habits.map(h => h.chain.best)), repairs: state.counters?.repairs || 0, perfectWeek: perfect,
       medOnTime: allDays.filter(d => d.medOnTime).length, questsDone: state.questHistory.filter(q => q.result === 'completed').length,
-      kills: allTrophies.length, bosses: allTrophies.filter(t => MONSTERS.find(m => m.id === t.id)?.boss).length, regionCleared,
+      kills: allTrophies.length, bosses: allTrophies.filter(t => MONSTERS.find(m => m.id === t.id)?.boss).length, regionCleared, regionKills,
       legend: chars.some(c => c.legend), swords: state.swords.owned.length,
-      maxUp: Math.max(0, ...Object.values(state.swords.up || {})),
+      forged: state.counters?.forged || 0,
       ownSchoolSet: state.swords.owned.some(id => { const w = swordById(id); return w && w.set && w.school === sc(); }),
       legendaryCards: chars.some(c => Object.keys(c.collection || {}).some(a => CARD_BY_ART[a]?.r === 'Legendary')) ? 1 : 0,
       uniqueCards: Math.max(...chars.map(c => Object.keys(c.collection || {}).length)),
       links: completeLinks().length, hall: (state.hall || []).length,
+      ...(() => { const vs = completeLinks().map(l => ({ l, v: linkValue(l) }));
+        return { linkAllLegend: vs.some(x => x.l.cards.every(a => CARD_BY_ART[a]?.r === 'Legendary')), linkExtraMax: Math.max(0, ...vs.map(x => x.v.shared.length)),
+          linkSchool: vs.filter(x => x.v.fav).length, linkFactions: new Set(vs.map(x => x.l.f)).size, linkTotal: countedLinks().reduce((t, x) => t + x.v.total, 0) }; })(),
     };
   }
   function checkAchievements() {
@@ -1701,14 +2123,14 @@ function createEngine(state, opts = {}) {
     state, ev, now, logicalToday, maxHp, xpNeed,
     W: (k, hid) => on(hid, () => W(k)), upcoming: (n = now(), hid) => on(hid, () => upcoming(n)), phase: (k, n = now(), hid) => on(hid, () => phase(k, n)),
     projectedMult: (k, hid) => on(hid, () => projectedMult(k)), isSleep: hid => on(hid, () => isSleep()),
-    prep: hid => on(hid, () => prep()), checkIn: hid => on(hid, () => checkIn()), addCount: (n, hid) => on(hid, () => addCount(n)),
+    prep: hid => on(hid, () => prep()), checkIn: hid => on(hid, () => checkIn()), addCount: (n, hid) => on(hid, () => addCount(n)), toggleItem: (name, hid) => on(hid, () => toggleItem(name)),
     continueMastery: hid => on(hid, () => continueMastery()), correctableDay: hid => on(hid, () => correctableDay()),
     correctMissed: (k, o = {}, hid) => on(hid ?? o.hid, () => correctMissed(k, o)),
-    habitById, chainDamage, advanceCombat, combatInfo, drinkPotion, failHit, playerStats, queueAdd, queueRemove, debuffPct, isRest, restTarget, restBy: k => restBy(k), restUsedInWeek, removeHabit, habitTypeName,
+    habitById, chainDamage, advanceCombat, combatInfo, drinkPotion, drinkThunder, throwDancing, failHit, playerStats, queueAdd, queueRemove, debuffPct, isRest, restTarget, restBy: k => restBy(k), restUsedInWeek, removeHabit, habitTypeName,
     declareRest, processPending, completeSide, addSide, removeSide, shopItems, buy, craft,
-    changeSchool, startQuest, updateQuest, init, drawCards, log,
-    damageBonus, completeLinks, buySword, equipSword, dailySwords, rerollShop, transferUpgrades, transferFee, dismantleSword, dismantleValue,
-    craftSword, craftCost, bestSwordFor, equipBest, dropDiagram, shopRerollCost, rerollBoard, boardRerollCost, upgradeSword, upgradeCost, upLevel, swordValue, linkOptions, eligibleForLink, createLink, addToLink, removeFromLink, deleteLink,
+    changeSchool, changeFaction, factionProgress, startQuest, updateQuest, init, drawCards, log,
+    damageBonus, completeLinks, linkValue, linkOfCard, countedLinks, swordDmg, buffPct, buySword, equipSword, dailySwords, rerollShop, dismantleSword, dismantleValue, shopPrice,
+    craftSword, craftCost, bestSwordFor, equipBest, dropDiagram, shopRerollCost, rerollBoard, boardRerollCost, upgradeSword, upgradeCost, swordLv, swordValue, linkOptions, eligibleForLink, createLink, addToLink, removeFromLink, deleteLink,
     region, band, bandInfo, homeRegion, capLevel, atCap, xpBank, bossAvailable, postGame, isElite, fameNeed, boardEntries, ensureBoard, takeContract, openRegions, inPool, rebirth, snapshot, dev,
     legacy, checkAchievements, achStats, ensureWeekStats,
   };
@@ -1716,12 +2138,12 @@ function createEngine(state, opts = {}) {
 
 root.KM = {
   L, lang, bi, habitTypeName,
-  createEngine, newState, migrate, makeQuest, makeHabit, validateQuest, monStats, HABIT_TYPES, MAX_HABITS, CHAIN_WEIGHTS,
+  createEngine, newState, migrate, makeQuest, makeHabit, validateQuest, monStats, HABIT_TYPES, MAX_HABITS, MAX_ITEMS, CHAIN_WEIGHTS,
   time: { pad, dk, fromKey, addDays, at, addMin, hm, mondayOf, toMin, fromMin, longDate, sfx, DAYS, MONTHS },
   data: {
     ART, CARDS, CARD_BY_ART, RAR, RAR_TR, SCRAP, CRAFT, MONSTERS, CLASSES, REGIONS, BAND_COUNT, bandRegions, regionTier, monById, monImg, SCHOOLS, TIERS, tierOf, REPAIR_NEED,
     QUEST_MIN, QUEST_MAX, MASTERY_MULT, MASTERY_DMG, SHOP, DMG, DAY_XP, DAY_GOLD, CARDS_PER, REG, BOSS, BOARD_SIZE, MAX_LEVEL, xpNeed,
-    BONUS_STEPS, effectiveBonus, POTION, REST, DEFEAT, EFFECTS, EFFECT_CAP, BURST, HONEY_MAX, powerAt, hpAt, BAND_HOURS, TIER_DAYS, STEP_MIN, UPGRADE, CRIT_MULT, LINK_SIZE, LINK_BONUS, LINK_MAX, SWORDS, SWORD_TIERS, swordById, cardCats, dat, FACTIONS, FACTION_TR, SHOP_DAILY, REROLL, BANE, TRANSFER_FEE, DISMANTLE, DIAGRAM_FROM_REGION, SET_CRAFT_SCRAPS, LEGACY, ACHIEVEMENTS, RETRO_HOURS, ELITE, FAME,
+    BANE_TIERS, UNIQUE, UNIQUE_BY_ID, AERO, LEGEND_PRICE, POTION, THUNDER, OWL, DANCING, ALCH_DISCOUNT, schoolImg, REST, DEFEAT, REGEN, WOUNDED, EFFECTS, EFFECT_CAP, HONEY_MAX, powerAt, hpAt, BAND_HOURS, TIER_DAYS, REF_SWORD, REF_CHAIN, REF_LINKS, STEP_MIN, CRIT_MULT, swordBase, critBase, swordDmgAt, swordCritAt, swordPrice, rarityOdds, RARITY_ODDS, AERONDIGHT, SWORD_UP, SCRAP_PER_KILL, LINK_SIZE, LINK_BONUS, LINK_MAX, LINK_RAR, LINK_EXTRA, LINK_SCHOOL, SCHOOL_CATS, REGEN, WOUNDED, SWORDS, SWORD_TIERS, swordById, cardCats, dat, FACTIONS, FACTION_TR, SHOP_DAILY, START_KIT, HP_MULT, REROLL, BANE, DISMANTLE, DIAGRAM_FROM_REGION, SET_CRAFT_SCRAPS, LEGACY, ACHIEVEMENTS, RETRO_HOURS, ELITE, FAME,
   },
   uid,
 };
