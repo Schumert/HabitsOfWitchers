@@ -664,8 +664,8 @@ test('Bane: kılıç kendi sınıfındaki canavara +%15; en iyi kılıç kontrat
   if (banePick.type === 'silver') eq(s.swords.silver, banePick.id, 'bane kılıcı kuşanılmalı'); else eq(s.swords.steel, banePick.id);
   ok(E.damageBonus().raw >= D.BANE, 'avcı bonusu');
 });
-test('Avcı özellikleri: her üst kademe bir tür daha; Efsanevi ve üstü daha yüksek bonus', () => {
-  const cnt = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 4, 6: 5 }, pct = { 1: 15, 2: 15, 3: 15, 4: 25, 5: 20, 6: 25 };
+test('Avcı özellikleri: kademe yükseldikçe daha çok tür (Efsanevi 3); Efsanevi ve üstü daha yüksek bonus', () => {
+  const cnt = { 1: 1, 2: 2, 3: 3, 4: 3, 5: 4, 6: 5 }, pct = { 1: 15, 2: 15, 3: 15, 4: 25, 5: 20, 6: 25 };
   for (const w of D.SWORDS) {
     eq(w.banes.length, cnt[w.tier], w.name); eq(w.banePct, pct[w.tier], w.name);
     eq(w.banes[0], w.bane, 'ilk tür eski bane'); eq(new Set(w.banes).size, w.banes.length, 'tekrar yok');

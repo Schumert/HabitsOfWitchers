@@ -224,7 +224,7 @@ const REROLL = { shop: 100, boardBase: 20, boardPerRegion: 10 };
 const BANE = 15;                                                    // kılıcın bane sınıfındaki canavara ek ham hasar (%): Sıradan–Büyülü
 /* avcı özellikleri: kademe yükseldikçe kılıç bir canavar türüne daha karşı bonus kazanır; Efsanevi ve üstünde bonus daha yüksek.
  * [özellik sayısı, % bonus]. İlk tür swords.js'teki bane, ekler kılıcın kimliğinden sabit (rastgele ama her zaman aynı) seçilir. */
-const BANE_TIERS = { 1: [1, 15], 2: [2, 15], 3: [3, 15], 4: [4, 25], 5: [4, 20], 6: [5, 25] };
+const BANE_TIERS = { 1: [1, 15], 2: [2, 15], 3: [3, 15], 4: [3, 25], 5: [4, 20], 6: [5, 25] };
 SWORDS.forEach(w => {
   const [n, pct] = BANE_TIERS[w.tier] || [1, BANE];
   let h = hashStr('bane:' + w.id) || 1;

@@ -74,11 +74,11 @@ Each school also has 3 favourite card categories. Card links in those categories
   - Higher levels bring rarer swords more often.
   - A sword you buy is not replaced until the next day, or until you pay to restock.
 - You can raise a sword's level with crowns and scraps, up to your own level.
-- **Bane bonus:** every sword deals extra damage to certain monster types. Rarer swords cover more types:
+- **Bane bonus:** every sword deals extra damage to certain monster types. Rarer swords cover more types or hit harder:
   - Common: 1 type, +15%
   - Masterwork: 2 types, +15%
   - Magic: 3 types, +15%
-  - Legendary: 4 types, +25%
+  - Legendary: 3 types, +25%
 - **Unique traits:** every Legendary sword has its own trait, and no two swords share one. Examples: more damage at night, crits that deal ×2, extra cards from kills, surviving a killing blow once a week. Legendary swords cost 50% more.
 - **Aerondight:** very rare (from level 25, a 1% daily chance at the blacksmith).
   - It gains a charge for every 24 hours of fighting, up to +100% damage.
@@ -225,11 +225,11 @@ Her okulun 3 sevdiği kart türü de vardır. Bu türlerdeki kart bağları ×1,
   - Seviye yükseldikçe nadir kılıçlar daha sık çıkar.
   - Satın aldığın kılıcın yerine ertesi güne kadar, ya da para verip stoğu yenileyene kadar, yenisi gelmez.
 - Kılıcının seviyesini oren ve kırıntıyla, kendi seviyene kadar yükseltebilirsin.
-- **Avcı bonusu:** her kılıç belirli canavar türlerine ek hasar verir. Nadir kılıçlar daha çok türü kapsar:
+- **Avcı bonusu:** her kılıç belirli canavar türlerine ek hasar verir. Nadir kılıçlar daha çok türü kapsar ya da daha sert vurur:
   - Sıradan: 1 tür, +%15
   - Usta işi: 2 tür, +%15
   - Büyülü: 3 tür, +%15
-  - Efsanevi: 4 tür, +%25
+  - Efsanevi: 3 tür, +%25
 - **Benzersiz özellikler:** her Efsanevi kılıcın kendine ait bir özelliği vardır, iki kılıç aynı özelliği taşımaz. Örnekler: gece daha çok hasar, ×2 kritik, öldürmelerden ek kart, haftada bir ölümcül darbeden kurtulma. Efsanevi kılıçlar %50 daha pahalıdır.
 - **Aerondight:** çok nadirdir (25. seviyeden itibaren demircide günlük %1 şans).
   - Her 24 saatlik savaşta bir şarj kazanır, en çok +%100 hasara kadar.
