@@ -7,8 +7,6 @@ backups/
 hofw-ayar.json
 kaermorhen-ayar.json
 
-# İndirilen kart verisi (CD PROJEKT RED'e ait) / downloaded card data (owned by CD PROJEKT RED)
-cards.js
 
 # Araçlar / tooling
 .claude/

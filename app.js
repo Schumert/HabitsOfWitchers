@@ -181,7 +181,7 @@ const imgTag = (src, cls = '', alt = '') => `<img class="${cls}" src="${esc(imgS
 function cardHtml(c, opts = {}) {
   const cats = opts.cats ? `<div class="ccats">${cardCats(c).map(x => x === opts.cats ? `<b>${esc(x)}</b>` : esc(x)).join(' · ')}</div>` : '';
   return `<div class="card ${c.r}${opts.locked ? ' locked' : ''}" ${opts.noAct ? '' : 'data-act="card"'} data-a="${c.a}" ${opts.cats ? '' : `title="${esc(c.n)} — ${RAR_TR[c.r]}"`}>${cats}
-    ${imgTag(ART(c.a, opts.q || 'low'))}
+    ${imgTag(c.img || ART(c.a, opts.q || 'low'))}
     ${opts.count > 1 ? `<span class="count">×${opts.count}</span>` : ''}
     ${opts.isNew ? `<span class="newtag">${L('YENİ', 'NEW')}</span>` : ''}
     <div class="cname">${esc(c.n)}</div></div>`;
@@ -377,23 +377,28 @@ function renderHunt() {
   const status = ci.mode === 'recover' ? `<div class="cb-status recover">🩹 ${L(`Yenildin; ${sfx(hm(new Date(ci.until)), 'e')} kadar toparlanıyorsun, sonra tam canla ava dönersin.`, `You were defeated; recovering until ${hm(new Date(ci.until))}, then you return at full HP.`)}</div>`
     : c ? `<div class="cb-status fight">⚔ ${L('Avdasın; uygulama kapalıyken de devam eder. Canavar sana sadece görevlerinde başarısız olunca vurur.', 'Hunting; it continues while the app is closed. The monster only hits you when you fail a quest.')}</div>` : '';
   const wound = ci.wounded ? `<span class="effect exhausted" title="${L('Canın %50 altında', 'HP below 50%')}">🩸 ${L('Yaralı', 'Wounded')} −20%</span>` : '';
-  const effects = ci.effects.length || wound ? `<div class="cb-effects">${wound}${ci.effects.map(e => `<span class="effect ${e.kind}" title="${esc(e.src || '')}">${e.kind === 'tired' ? '😩 ' + L('Yorgun', 'Tired') + ` −${e.pct}%` : e.kind === 'focus' ? '🎯 ' + L('Odak', 'Focus') + ` +${e.pct}%` : e.kind === 'thunder' ? `⚡ Thunderbolt +${e.pct}%` : e.kind === 'early' || e.kind === 'discipline' ? `✦ ${esc(DATA.UNIQUE_BY_ID[e.kind].name)} +${e.pct}%` : '🥀 ' + L('Bitkin', 'Exhausted') + ` −${e.pct}%`} · ${fmtDur(new Date(e.until) - now())}</span>`).join('')}
+  const effects = ci.effects.length || wound ? `<div class="cb-effects">${wound}${ci.effects.map(e => `<span class="effect ${e.kind}" title="${esc(e.src || '')}">${e.kind === 'tired' ? '😩 ' + L('Yorgun', 'Tired') + ` −${e.pct}%` : e.kind === 'focus' ? '🎯 ' + L('Odak', 'Focus') + ` +${e.pct}%` : e.kind === 'thunder' ? `⚡ Thunderbolt +${e.pct}%` : e.kind === 'blackblood' ? `🩸 Black Blood +${L('%' + e.pct, e.pct + '%')} ${L('kritik', 'crit')}` : e.kind === 'early' || e.kind === 'discipline' ? `✦ ${esc(DATA.UNIQUE_BY_ID[e.kind].name)} +${e.pct}%` : '🥀 ' + L('Bitkin', 'Exhausted') + ` −${e.pct}%`} · ${fmtDur(new Date(e.until) - now())}</span>`).join('')}
       ${ci.deb ? `<small class="muted">${L(`Toplam hasar cezası −%${ci.deb}`, `Total damage penalty −${ci.deb}%`)}</small>` : ''}</div>` : '';
   const potions = `<div class="cb-potions">
       <span title="${L(`İçince +${ci.potionHeal} can. Can avda saatte %${+(ci.regen.fight * 100).toFixed(2)} dolar; yenilince saatte %${Math.round(ci.regen.idle * 100)} toparlanırsın.`, `Drinking gives +${ci.potionHeal} HP. HP regenerates ${+(ci.regen.fight * 100).toFixed(2)}%/h while hunting; after a defeat you recover ${Math.round(ci.regen.idle * 100)}%/h.`)}">🧪 Swallow <b>${ci.potions}/${ci.potionCap}</b></span>
       <button class="btn sm" data-act="drink" ${ci.potions < 1 || s.hp >= E.maxHp() ? 'disabled' : ''} title="+${ci.potionHeal} ${L('can', 'HP')}">🧪 ${L('İç', 'Drink')}</button>
       <button class="btn sm ghost" data-act="buy" data-id="swallow" ${ci.potions >= ci.potionCap || s.gold < ci.potionPrice ? 'disabled' : ''}>${L('Al', 'Buy')} · ${ci.potionPrice} 🪙</button>
-      <span title="${L('Kaçırılan bir günde kendiliğinden içilir: canavar vuramaz, Bitkin olmazsın', 'Drunk automatically on a missed day: the monster can\'t strike and you don\'t become Exhausted')}">🍯 White Honey <b>${ci.honey}</b></span></div>
+      <span title="${L('Kaçırılan bir günde kendiliğinden içilir: Bitkin olmazsın', 'Drunk automatically on a missed day: the monster can\'t strike and you don\'t become Exhausted')}">🍺 Mahakam Ale <b>${ci.honey}</b></span></div>
+    ${ci.thunders.map(t => `<div class="cb-potions">
+      <span title="${L(`${DATA.THUNDER.hours} saat boyunca hasar +%${t.pct}. Üst üste binmez: yenisi eskisinin yerine geçer.`, `+${t.pct}% damage for ${DATA.THUNDER.hours} hours. Doesn't stack: a new one replaces the old.`)}">⚡ ${esc(t.name)} +${L('%' + t.pct, t.pct + '%')} <b>${t.n}/${ci.thunderCap}</b></span>
+      <button class="btn sm" data-act="thunder" data-id="${t.id}" ${t.n < 1 ? 'disabled' : ''}>⚡ ${L('İç', 'Drink')}</button>
+      ${t.locked ? '' : `<button class="btn sm ghost" data-act="buy" data-id="${t.id}" ${t.n >= ci.thunderCap || s.gold < t.price ? 'disabled' : ''}>${L('Al', 'Buy')} · ${t.price} 🪙</button>`}</div>`).join('')}
     <div class="cb-potions">
-      <span title="${L(`${DATA.THUNDER.hours} saat boyunca hasar +%${DATA.THUNDER.pct}`, `+${DATA.THUNDER.pct}% damage for ${DATA.THUNDER.hours} hours`)}">⚡ Thunderbolt <b>${ci.thunder}/${ci.thunderCap}</b></span>
-      <button class="btn sm" data-act="thunder" ${ci.thunder < 1 ? 'disabled' : ''}>⚡ ${L('İç', 'Drink')}</button>
-      <button class="btn sm ghost" data-act="buy" data-id="thunder" ${ci.thunder >= ci.thunderCap || s.gold < ci.thunderPrice ? 'disabled' : ''}>${L('Al', 'Buy')} · ${ci.thunderPrice} 🪙</button>
-      <span title="${L(`Canavara ${ci.dancingMin}–${ci.dancingMax} hasar (3–10 saatlik); canın −${ci.dancingCost}`, `${ci.dancingMin}–${ci.dancingMax} damage to the monster (3–10 hours' worth); costs you ${ci.dancingCost} HP`)}">✴ Dancing Star <b>${ci.dancing}/${ci.dancingCap}</b></span>
-      <button class="btn sm" data-act="dancing" ${ci.dancing < 1 || !c || ci.mode === 'recover' || s.hp <= ci.dancingCost ? 'disabled' : ''} title="${L(`${ci.dancingMin}–${ci.dancingMax} hasar · −${ci.dancingCost} can (canın %50'nin üstünde olmalı)`, `${ci.dancingMin}–${ci.dancingMax} damage · −${ci.dancingCost} HP (HP must be above 50%)`)}">✴ ${L('At', 'Throw')} · ${ci.dancingMin}–${ci.dancingMax}</button>
+      <span title="${esc(DATA.SHOP.find(i => i.id === 'blackblood').desc)}">🩸 Black Blood <b>${s.blackblood || 0}/${DATA.BLACKBLOOD.cap}</b></span>
+      <button class="btn sm" data-act="itemuse" data-id="blackblood" ${(s.blackblood || 0) < 1 ? 'disabled' : ''}>🩸 ${L('İç', 'Drink')}</button>
+      <button class="btn sm ghost" data-act="buy" data-id="blackblood" ${(s.blackblood || 0) >= DATA.BLACKBLOOD.cap || s.gold < E.shopItems().find(i => i.id === 'blackblood').price ? 'disabled' : ''}>${L('Al', 'Buy')} · ${E.shopItems().find(i => i.id === 'blackblood').price} 🪙</button></div>
+    <div class="cb-potions">
+      <span title="${L(`Canavara ${ci.dancingMin}–${ci.dancingMax} hasar (3–10 saatlik). Attıktan sonra ${ci.dancingCooldown} saat yenisi atılamaz.`, `${ci.dancingMin}–${ci.dancingMax} damage to the monster (3–10 hours' worth). After a throw you must wait ${ci.dancingCooldown} hours.`)}">✴ Dancing Star <b>${ci.dancing}/${ci.dancingCap}</b></span>
+      <button class="btn sm" data-act="dancing" ${ci.dancing < 1 || !c || ci.mode === 'recover' || ci.dancingWait > 0 ? 'disabled' : ''} title="${L(`${ci.dancingMin}–${ci.dancingMax} hasar`, `${ci.dancingMin}–${ci.dancingMax} damage`)}">✴ ${ci.dancingWait > 0 ? `⏳ ${fmtDur(ci.dancingWait)}` : `${L('At', 'Throw')} · ${ci.dancingMin}–${ci.dancingMax}`}</button>
       <button class="btn sm ghost" data-act="buy" data-id="dancing" ${ci.dancing >= ci.dancingCap || s.gold < ci.dancingPrice ? 'disabled' : ''}>${L('Al', 'Buy')} · ${ci.dancingPrice} 🪙</button></div>`;
   const queue = (s.queue || []).length ? `<div class="cb-queue"><small class="muted">${L('Av sırası', 'Hunt queue')}:</small> ${s.queue.map(id => `<span class="q-item">${esc(monById(id).name)} <button class="btn sm ghost" data-act="unqueue" data-id="${id}" title="${L('Sıradan çıkar', 'Remove')}">✕</button></span>`).join('')}</div>` : '';
   const atCap = E.atCap();
-  const levelInfo = s.legend ? L("Efsanesin. Bu karakterle devam edebilirsin: kestiğin canavarlar ve bölge boss'ları elit olarak geri dönüyor, TP Ün (★) kazandırıyor. İstersen Okul'da yeniden doğabilirsin.", "You are a legend. Keep playing this character: slain monsters and region bosses return as elites, and XP earns Renown (★). You can also be reborn in the School.")
+  const levelInfo = s.legend ? L("Efsanesin. Bu karakterle devam edebilirsin: kestiğin canavarlar ve bölge boss'ları elit olarak geri dönüyor, TP Ün (★) kazandırıyor. İstersen Karakterlerim sekmesinden yeniden doğabilirsin.", "You are a legend. Keep playing this character: slain monsters and region bosses return as elites, and XP earns Renown (★). You can also be reborn in the School.")
     : atCap ? L(`Seviye sınırındasın (${bnd.max}). İlerlemek için bu kademenin boss'larından birini yen: ${bandBossNames()}.`, `You're at the level cap (${bnd.max}). Defeat one of this tier's bosses to advance: ${bandBossNames()}.`)
     : L(`Seviye ${s.level}. Bu kademenin sınırı ${bnd.max}; sınıra gelince boss'lar açılır.`, `Level ${s.level}. This tier caps at ${bnd.max}; at the cap the bosses unlock.`);
   $('#regionPanel').innerHTML = `<div class="region-strip">
@@ -571,7 +576,7 @@ const TYPE_HELP = {
   count: () => L('Günlük bir sayı hedefi (ör. 8 bardak su, 30 şınav). Gün içinde ekledikçe ilerler; yarısı gecikme sayılır.', 'A daily number target (e.g. 8 glasses of water, 30 push-ups). Add as you go; half counts as late.'),
   check: () => L('Gün içinde herhangi bir saatte yapıp işaretlersin (ör. kitap okuma).', 'Do it any time during the day and mark it (e.g. reading).'),
 };
-function questForm(q, mode) {
+function questForm(q, mode, { noSleep = false } = {}) {
   const type = q.type === 'daily' ? 'window' : q.type, fid = mode + (q.id ? '_' + q.id : '');
   const s = q.sleep || { bedStart: '00:00', bedEnd: '02:00', wakeStart: '08:00', wakeEnd: '08:30' };
   const d = q.daily || { start: '18:00', end: '22:00' };
@@ -580,8 +585,9 @@ function questForm(q, mode) {
   return `<div class="qform" data-mode="${mode}" data-qtype="${type}">
     <label>${L('Alışkanlık', 'Habit')}</label><input data-q="name" value="${esc(q.name || '')}" placeholder="${L('ör. Spor, kitap okuma, su içmek', 'e.g. exercise, reading, drinking water')}">
     ${mode === 'new' ? `<label>${L('Tür', 'Type')}</label>
-    <div class="type-pick">${['check', 'count', 'window', 'sleep'].map(t => `<label class="radio type-opt"><input type="radio" name="qtype_${fid}" data-q="type" value="${t}" ${type === t ? 'checked' : ''}>
-      <b>${esc(habitTypeName(t))}</b><small class="muted">${TYPE_HELP[t]()}</small></label>`).join('')}</div>` : `<p class="muted" style="margin:4px 0">${L('Tür', 'Type')}: ${typeBadge({ type })} ${TYPE_HELP[type]()}</p>`}
+    <div class="type-pick">${['check', 'count', 'window', 'sleep'].map(t => { const off = noSleep && t === 'sleep';
+      return `<label class="radio type-opt ${off ? 'disabled' : ''}" ${off ? `title="${L('Zaten bir uyku düzenin var; en fazla bir tane olabilir.', 'You already have a sleep schedule; only one is allowed.')}"` : ''}><input type="radio" name="qtype_${fid}" data-q="type" value="${t}" ${type === t && !off ? 'checked' : ''} ${off ? 'disabled' : ''}>
+      <b>${esc(habitTypeName(t))}</b><small class="muted">${off ? L('Zaten bir uyku düzenin var (en fazla bir tane).', 'You already have a sleep schedule (only one allowed).') : TYPE_HELP[t]()}</small></label>`; }).join('')}</div>` : `<p class="muted" style="margin:4px 0">${L('Tür', 'Type')}: ${typeBadge({ type })} ${TYPE_HELP[type]()}</p>`}
     <div class="row">
       <div><label>${L(`Hedef süre (gün, ${QUEST_MIN}–${QUEST_MAX})`, `Goal (days, ${QUEST_MIN}–${QUEST_MAX})`)}</label><input type="number" data-q="days" min="${QUEST_MIN}" max="${QUEST_MAX}" value="${q.days || 30}" style="width:110px"></div>
       ${sec('sleep window check', `<label>${L('Gecikme toleransı (dk)', 'Late tolerance (min)')}</label><input type="number" data-q="lateMin" min="15" max="240" value="${q.lateMin || 60}" style="width:110px">`)}
@@ -631,7 +637,7 @@ function renderMainQuest() {
     <p class="muted">${L(`Her alışkanlığın kendi zinciri ve hedefi var. Alışkanlığı <b>hedef gün kadar başarıyla</b> edinirsin (art arda olması gerekmez): 150 oren, 100 TP ve bir Efsanevi kart. Sonra ustalıkla sürdürür ya da listeden çıkarıp yerine yenisini eklersin. ${MULTI_CHAIN_TXT()} Alışkanlıklar karakterden bağımsızdır; yeniden doğsan da sürer.`,
       `Each habit has its own chain and goal. You form a habit after <b>as many successful days as its goal</b> (not necessarily in a row): 150 crowns, 100 XP and a Legendary card. Then keep it in mastery or remove it and add a new one. ${MULTI_CHAIN_TXT()} Habits don't belong to the character; they carry on even if you're reborn.`)}</p>
     ${cards}
-    ${s.habits.length < MAX_HABITS ? `<details class="box" open><summary><b>＋ ${L('Yeni alışkanlık', 'New habit')}</b></summary><div class="habit-new">${questForm({ type: 'check', days: 30, lateMin: 60 }, 'new')}
+    ${s.habits.length < MAX_HABITS ? `<details class="box" open><summary><b>＋ ${L('Yeni alışkanlık', 'New habit')}</b></summary><div class="habit-new">${questForm({ type: 'check', days: 30, lateMin: 60 }, 'new', { noSleep: s.habits.some(h => h.type === 'sleep') })}
       <div class="row" style="margin-top:10px"><button class="btn" data-act="questnew">${L('Alışkanlığı başlat', 'Start the habit')}</button></div></div></details>`
       : `<p class="muted">${L(`En fazla ${MAX_HABITS} alışkanlık. Yenisi için birini listeden çıkar.`, `At most ${MAX_HABITS} habits. Remove one to add another.`)}</p>`}
     <h3>${L('Geçmiş', 'History')}</h3>
@@ -691,18 +697,51 @@ function renderCollection() {
       <select data-f="fac"><option value="">${L('Tüm fraksiyonlar', 'All factions')}</option>${poolFactions().map(f => `<option value="${f}">${facName(f)}</option>`).join('')}</select>
       <input data-f="q" placeholder="${L('Ara...', 'Search...')}" value="${esc(colFilter.q)}">
     </div>
+    ${(() => { const os = (st().oddities || []).map(odd).filter(o => o?.card); return os.length && colFilter.page === 0 && !colFilter.q
+      ? `<div class="row" style="justify-content:space-between;align-items:center"><h3 style="margin:0">🧬 ${L('Tuhaflıklar', 'Oddities')}</h3>${oddToggle()}</div>${!oddShown() ? '' : `<div class="cards odd-cards">${os.map(o => `<div data-act="oddity" data-id="${o.id}">${cardHtml({ a: 0, img: o.img, n: o.name, r: o.r }, { noAct: true })}</div>`).join('')}</div>`}<h3>${L('Gwent kartları', 'Gwent cards')}</h3>` : ''; })()}
     ${slice.length ? `<div class="cards">${slice.map(c => cardHtml(c, { locked: !col[c.a], count: col[c.a] })).join('')}</div>` : `<p class="muted">${L('Burada henüz kart yok.', 'No cards here yet.')}</p>`}
     <div class="pager">${pages > 1 ? `<button class="btn" data-act="page" data-v="-1" ${colFilter.page === 0 ? 'disabled' : ''}>‹</button>
       <span>${colFilter.page + 1} / ${pages}</span><button class="btn" data-act="page" data-v="1" ${colFilter.page >= pages - 1 ? 'disabled' : ''}>›</button>` : ''}</div>`;
   for (const k of ['owned', 'rar', 'fac']) $(`#collectionPanel [data-f="${k}"]`).value = colFilter[k];
 }
+/* kart özellikleri (cards-info.json, tools/fetch_cards.py üretir): sadece gösterim, oyun mekaniği değil. İlk açılışta bir kez yüklenir. */
+let cardInfo = null, cardInfoP = null;
+const loadCardInfo = () => (cardInfoP ||= fetch('cards-info.json').then(r => (r.ok ? r.json() : null)).catch(() => null).then(j => (cardInfo = j)));
+const kwText = (txt, kws) => {
+  let h = esc(txt).replace(/\n/g, '<br>');
+  const names = [...new Set(kws.map(k => k[0]))].sort((x, y) => y.length - x.length);
+  if (names.length) h = h.replace(new RegExp(`\\b(${names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'g'), '<b class="kw">$1</b>');
+  return h;
+};
+function cardInfoHtml(a) {
+  const id = cardInfo?.byArt?.[a], ci = id && cardInfo.byCard[id];
+  if (!ci) return cardInfo ? '' : `<p class="muted">${L('Kart özellikleri yükleniyor…', 'Loading card details…')}</p>`;
+  const stats = [ci.t === 'Unit' ? `⚔ ${L('Güç', 'Power')} <b>${ci.p}</b>` : '', ci.ar ? `🛡 ${L('Zırh', 'Armor')} <b>${ci.ar}</b>` : '', ci.pr ? `⚖ ${L('Provizyon', 'Provision')} <b>${ci.pr}</b>` : '', ci.col ? esc(ci.col) : ''].filter(Boolean);
+  const rel = ci.rel.map(r => cardInfo.byCard[r]).filter(Boolean);
+  return `<div class="cinfo">
+    ${stats.length ? `<div class="cinfo-stats">${stats.map(x => `<span>${x}</span>`).join('')}</div>` : ''}
+    ${ci.ab ? `<p class="cinfo-ab">${kwText(ci.ab, ci.kw)}</p>` : ''}
+    ${rel.map(t => `<div class="cinfo-rel">${imgTag(ART(t.a, 'low'))}<div><b>${esc(t.n)}</b><small>${esc(t.c || t.t)}${t.t === 'Unit' ? ` · ⚔ ${t.p}` : ''}</small>${t.ab ? `<small>${kwText(t.ab, t.kw)}</small>` : ''}</div></div>`).join('')}
+    ${ci.kw.length ? `<details class="cinfo-kw"><summary>${L('Anahtar kelimeler', 'Keywords')}</summary>${ci.kw.map(([k, d]) => `<div><b class="kw">${esc(k)}:</b> ${esc(d)}</div>`).join('')}</details>` : ''}
+    ${ci.set ? `<small class="muted">Set: ${esc(ci.set)}</small>` : ''}</div>`;
+}
+const cardInfoOn = () => { try { return localStorage.getItem('hofw-cardinfo') === '1'; } catch { return false; } };
+/* çizen (herkese açık): kart görselinin sanatçısına teşekkür. Veri yüklenmemişse yüklenince yerine yazılır. */
+const artistOf = a => { const id = cardInfo?.byArt?.[a]; return (id && cardInfo.byCard[id]?.by) || ''; };
+const artistHtml = a => { const by = artistOf(a); return by ? `🎨 ${L('Çizen', 'Illustration by')}: <b>${esc(by)}</b>` : ''; };
+const artistSlot = a => { if (!cardInfo) loadCardInfo().then(() => { const el = $('#artistSlot'); if (el && +el.dataset.a === +a) el.innerHTML = artistHtml(a); }); return `<p class="artist muted" id="artistSlot" data-a="${a}">${artistHtml(a)}</p>`; };
 function showCardDetail(a) {
   const c = CARD_BY_ART[a]; if (!c) return;
   const cnt = st().collection[a] || 0;
+  const showInfo = TEST && cardInfoOn();   // kart özellikleri şimdilik sadece test modunda, aç/kapa ile
+  if (showInfo && !cardInfo) loadCardInfo().then(() => { const el = $('#cinfoSlot'); if (el) el.innerHTML = cardInfoHtml(a); });
   openModal(`<div class="card-detail">${cardHtml(c, { q: 'medium', locked: !cnt, noAct: true })}
     <div style="flex:1;min-width:240px">
       <h2>${esc(c.n)}</h2>
       <p><span class="rar-${c.r}">${RAR_TR[c.r]}</span> · ${esc(facName(c.f))} · ${esc(c.c || c.t)}</p>
+      ${artistSlot(a)}
+      ${TEST ? `<button class="btn sm ghost" data-act="cardinfo" data-a="${a}">📜 ${showInfo ? L('Kart özelliklerini gizle', 'Hide card details') : L('Kart özelliklerini göster', 'Show card details')} <small class="muted">(${L('test', 'test')})</small></button>` : ''}
+      ${showInfo ? `<div id="cinfoSlot">${cardInfoHtml(a)}</div>` : ''}
       ${c.fl ? `<p class="flavor">${esc(c.fl)}</p>` : ''}
       <p>${cnt ? `${L('Koleksiyonda', 'In collection')}: <b>${cnt}</b>` : L('Henüz sende yok.', "You don't have it yet.")}</p>
       <div class="row">
@@ -799,8 +838,196 @@ function renderBestiary() {
     }).join('')}`;
 }
 
-/* ---------- tüccar + demirci ---------- */
-function renderShop() {
+/* ---------- tüccar kartları + Eşyalarım ---------- */
+const itemOwned = i => (i.own ? st()[i.own] || 0 : 0);
+const itemCap = i => ({ swallow: DATA.POTION.cap, honey: E.honeyMax(), dancing: DATA.DANCING.cap, blackblood: DATA.BLACKBLOOD.cap }[i.own] ?? DATA.THUNDER.cap);
+/* küçük kart: tıklayınca showItemDetail büyütür */
+function itemCard(i, mode) {
+  const n = itemOwned(i), s = st();
+  const foot = mode === 'shop'
+    ? (i.locked ? `<span class="muted">🔒 ${L(`Sv ${i.lv}`, `Lv ${i.lv}`)}</span>` : i.id === 'mutagen' && !E.oddLeft().length ? `<span class="muted">${L('Tükendi', 'Sold out')}</span>` : `<span class="price ${s.gold < i.price ? 'short' : ''}">${i.price} 🪙</span>`)
+    : `<span class="muted">${n}/${itemCap(i)}</span>`;
+  return `<div class="item-card ${i.locked ? 'is-locked' : ''}" data-act="item" data-id="${i.id}" data-mode="${mode}" title="${esc(i.name)}">
+    ${cardHtml({ a: i.art, n: i.name, r: i.r }, { noAct: true, locked: i.locked })}
+    ${n ? `<span class="item-count">×${n}</span>` : ''}
+    <div class="item-foot">${foot}</div></div>`;
+}
+/* ---------- Günlük mini oyunlar ---------- */
+let miniSel = { date: null, kind: null, slots: [], img: null, cls: [], pick: null };
+const miniArt = (a, extra = '') => `<div class="mini-img ${extra}">${imgTag(ART(a, 'low'))}</div>`;
+const clsName = c => CLASSES[c]?.tr || c;
+let miniMode = 'daily';   // 'daily' (günde bir, ödüllü) | 'practice' (antrenman: sınırsız, ödülsüz)
+const MINI_NAMES = { match: ['Kart Eşleştirme', 'Card Match'], class: ['Canavar Türü', 'Monster Types'], missing: ['Eksik Kart', 'The Missing Card'], odd: ['Yabancıyı Bul', 'Odd One Out'] };
+const curMini = () => (miniMode === 'practice' ? E.practiceGame() : E.miniGame());
+function renderMini() {
+  const el = $('#miniPanel'), P = miniMode === 'practice';
+  const modes = `<div class="filters"><button class="btn sm ${P ? 'ghost' : ''}" data-act="minimode" data-k="daily">🎲 ${L('Günlük oyun', 'Daily game')}</button>
+    <button class="btn sm ${P ? '' : 'ghost'}" data-act="minimode" data-k="practice">🏋 ${L('Antrenman (ödülsüz)', 'Practice (no reward)')}</button></div>`;
+  const pickKinds = (cur, act) => `<div class="filters">${DATA.MINI.kinds.map(k => `<button class="btn sm ${cur === k ? '' : 'ghost'}" data-act="${act}" data-k="${k}">${esc(L(...MINI_NAMES[k]))}</button>`).join('')}</div>`;
+  const g = curMini();
+  if (P && !g) { el.innerHTML = `${modes}<h2>🏋 ${L('Antrenman', 'Practice')}</h2><p class="muted">${L('İstediğin oyunu istediğin kadar oyna. Oren, başarım ya da sayaç kazandırmaz; sadece pratik içindir.', "Play any game as often as you like. It gives no crowns, achievements or counts; it's just for practice.")}</p>${pickKinds(null, 'practice')}`; return; }
+  if (!g) { el.innerHTML = `${modes}<h2>${L('Günlük oyun', 'Daily game')}</h2><p class="muted">${L('Bugün oynanabilecek bir oyun yok.', 'No game available today.')}</p>`; return; }
+  const gid = g.id || g.date;
+  if (miniSel.date !== gid || miniSel.kind !== g.kind) miniSel = { date: gid, kind: g.kind, slots: [], img: null, cls: [], pick: null };
+  const S = miniSel, d = g.data, done = g.done, ans = g.answer, key = g.key;
+  const help = { match: L('Her kartın adını ve sözünü oku; alttaki resimlerden doğru olanı seçip karta yerleştir. Hepsi doğru olmalı.', "Read each card's name and flavour text; pick the right art from below and place it on the card. All must be right."),
+    class: L('Her canavarın türünü listeden seç. Hepsi doğru olmalı.', "Pick each monster's type from the list. All must be right."),
+    missing: L('Bu 20 karttan biri sende yok. Hangisi?', "You don't own one of these 20 cards. Which one?"),
+    odd: L('Bu kartların hepsi aynı fraksiyondan. Birinin türü diğerlerinin hiçbiriyle uyuşmuyor. Hangisi?', "These cards are all from the same faction. One shares no type with any of the others. Which one?") }[g.kind];
+  let body = '';
+  if (g.kind === 'match') {
+    const placed = done ? ans : S.slots, used = new Set(placed.filter(Boolean).map(String));
+    body = `<div class="mini-templates">${d.templates.map((t, i) => { const a = placed[i], ok = done && String(a) === String(key[i]);
+      return `<div class="mini-tpl ${done ? (ok ? 'right' : 'wrong') : ''}" data-act="${done ? '' : 'minislot'}" data-i="${i}">
+        ${a ? miniArt(a) : `<div class="mini-img empty">${S.img && !done ? L('Buraya koy', 'Place here') : '?'}</div>`}
+        <div class="mini-tpl-txt"><b>${esc(t.n)}</b><small class="flavor">${esc(t.fl)}</small>
+        ${done && !ok ? `<small class="good">✓ ${L('Doğrusu', 'Correct')}:</small>${miniArt(key[i], 'tiny')}` : ''}</div></div>`; }).join('')}</div>
+      ${done ? '' : `<h3>${L('Resimler', 'Art')} <small class="muted">${L('önce bir resim seç, sonra karta tıkla', 'pick an image, then click a card')}</small></h3>
+      <div class="mini-tray">${d.images.filter(a => !used.has(String(a))).map(a => `<div data-act="miniimg" data-a="${a}" class="${String(S.img) === String(a) ? 'sel' : ''}">${miniArt(a)}</div>`).join('') || `<p class="muted">${L('Hepsi yerleşti.', 'All placed.')}</p>`}</div>`}`;
+  } else if (g.kind === 'class') {
+    const pick = done ? ans : S.cls;
+    body = `<div class="mini-mons">${d.monsters.map((m, i) => { const ok = done && pick[i] === key[i];
+      return `<div class="mini-mon ${done ? (ok ? 'right' : 'wrong') : ''}"><div class="mini-img">${imgTag(m.img)}</div><b>${esc(m.name)}</b>
+        ${done ? `<small>${ok ? '✓' : '✗'} ${esc(clsName(pick[i]))}${ok ? '' : ` → <b class="good">${esc(clsName(key[i]))}</b>`}</small>`
+          : `<select data-minicls="${i}"><option value="">${L('Tür seç…', 'Pick a type…')}</option>${d.options.map(c => `<option value="${c}" ${pick[i] === c ? 'selected' : ''}>${esc(clsName(c))}</option>`).join('')}</select>`}</div>`; }).join('')}</div>`;
+  } else {
+    const pick = done ? ans : S.pick;
+    body = `${g.kind === 'odd' ? `<p class="muted">${L('Fraksiyon', 'Faction')}: <b>${esc(facName(d.faction))}</b></p>` : ''}
+      <div class="mini-cards">${d.cards.map(a => { const c = CARD_BY_ART[a], isKey = done && String(a) === String(key), isPick = String(a) === String(pick);
+        return `<div class="mini-card ${isPick ? 'sel' : ''} ${isKey ? 'right' : done && isPick ? 'wrong' : ''}" data-act="${done ? '' : 'minipick'}" data-a="${a}">
+          ${cardHtml(c, { noAct: true })}${done && g.kind === 'odd' ? `<small>${esc(c.c)}</small>` : ''}</div>`; }).join('')}</div>`;
+  }
+  const result = done ? `<div class="mini-result ${g.won ? 'win' : 'lose'}">${g.won ? `🏆 ${P ? L('Doğru!', 'Correct!') : L(`Kazandın! +${g.got} oren.`, `You won! +${g.got} crowns.`)}` : `✗ ${L('Bu sefer olmadı.', 'Not this time.')}`}
+      ${P ? ` <button class="btn sm" data-act="practice" data-k="${g.kind}">↻ ${L('Yeni oyun', 'New game')}</button>` : g.next ? L(` Yarının oyunu: <b>${esc(g.next)}</b>.`, ` Tomorrow's game: <b>${esc(g.next)}</b>.`) : ''}</div>` : '';
+  el.innerHTML = `${modes}<div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">${P ? '🏋' : '🎲'} ${esc(g.name)}</h2>
+      <span class="muted">${P ? L('Antrenman: ödül yok', 'Practice: no reward') : L(`Kazanırsan +${g.reward} oren (seviye × ${st().school === 'cat' ? DATA.MINI.perCat : DATA.MINI.per})`, `Win for +${g.reward} crowns (level × ${st().school === 'cat' ? DATA.MINI.perCat : DATA.MINI.per})`)}</span></div>
+    <p class="muted">${help} ${P ? L('Antrenmanda istediğin kadar oynayabilirsin.', 'In practice you can play as often as you like.') : L('Günde bir deneme hakkın var; her gün sıradaki oyun açılır.', 'You get one try a day; each day the next game opens.')}</p>
+    ${P ? pickKinds(g.kind, 'practice') : ''}
+    ${TEST && !P ? `<div class="filters mini-test"><small class="muted">🧪 ${L('Test: oyun seç', 'Test: pick a game')}</small>
+      <button class="btn sm ${E.dev.miniForced() ? 'ghost' : ''}" data-act="minikind" data-k="">${L('Bugünkü', "Today's")}</button>
+      ${DATA.MINI.kinds.map(k => `<button class="btn sm ${E.dev.miniForced() === k ? '' : 'ghost'}" data-act="minikind" data-k="${k}">${esc(L(...{ match: ['Kart Eşleştirme', 'Card Match'], class: ['Canavar Türü', 'Monster Types'], missing: ['Eksik Kart', 'The Missing Card'], odd: ['Yabancıyı Bul', 'Odd One Out'] }[k]))}</button>`).join('')}
+      ${done ? `<button class="btn sm ghost" data-act="minireset">↺ ${L('Tekrar oyna', 'Play again')}</button>` : ''}</div>` : ''}
+    ${result}${body}
+    ${done ? '' : `<div class="row" style="justify-content:center;margin-top:16px"><button class="btn big" data-act="miniplay">${L('Onayla', 'Confirm')}</button></div>`}`;
+}
+function miniAnswer() {
+  const g = curMini(); if (!g) return null;
+  if (g.kind === 'match') return g.data.templates.map((_, i) => miniSel.slots[i] ?? null);
+  if (g.kind === 'class') return g.data.monsters.map((_, i) => miniSel.cls[i] || null);
+  return miniSel.pick;
+}
+
+/* ---------- Mutagenerator: tuhaf eşyalar ---------- */
+const odd = id => DATA.ODDITY_BY[id];
+const oddShown = () => st().settings?.showOdd !== false;
+const oddToggle = () => `<button class="btn sm ghost" data-act="oddtoggle">${oddShown() ? L('🙈 Tuhaflıkları gizle', '🙈 Hide oddities') : L('🧬 Tuhaflıkları göster', '🧬 Show oddities')}</button>`;
+const oddCard = o => `<div class="item-card" data-act="oddity" data-id="${o.id}" title="${esc(o.name)}">${cardHtml({ a: 0, img: o.img, n: o.name, r: o.r }, { noAct: true })}</div>`;
+function showOddity(id, fresh = false) {
+  const o = odd(id); if (!o) return;
+  const card = `<div class="item-detail">${cardHtml({ a: 0, img: o.img, n: o.name, r: o.r }, { noAct: true })}
+    <h2>${esc(o.name)}</h2><p class="flavor">${esc(o.desc)}</p>
+    <div class="row" style="justify-content:center"><button class="btn" data-act="close">${fresh ? L('...Tamam', '...Okay') : L('Kapat', 'Close')}</button></div></div>`;
+  if (!fresh) return openModal(card, 'item-modal');
+  new Image().src = o.img;   // makine çalışırken görsel önceden yüklensin
+  openModal(`<div class="item-detail mutagen-run"><div class="mutagen-machine">${imgTag(ART(3945, 'medium'))}</div>
+    <p class="muted">${L('Mutagenerator homurdanıyor, köpürüyor…', 'The Mutagenerator rumbles and bubbles…')}</p></div>`, 'item-modal');
+  playSound('rare');
+  setTimeout(() => { if ($('.mutagen-run')) { openModal(card, 'item-modal'); playSound('legendary'); } }, 2200);
+}
+
+/* büyük kart: altta özellik; tüccarda satın al, Eşyalarım'da kullan */
+function showItemDetail(id, mode) {
+  const i = E.shopItems().find(x => x.id === id); if (!i) return;
+  const s = st(), n = itemOwned(i), ci = E.combatInfo();
+  let btns = '';
+  if (mode === 'shop' && i.id === 'puzzle' && E.puzzleQuestion()) {
+    btns = `<button class="btn" data-act="puzzleopen">🧩 ${L('Bilmeceye dön', 'Back to the riddle')}</button>`;
+  } else if (mode === 'shop') {
+    btns = i.locked ? `<span class="muted">🔒 ${L(`${i.lv}. seviyede açılır`, `Unlocks at level ${i.lv}`)}</span>`
+      : `<button class="btn" data-act="itembuy" data-id="${i.id}" ${i.disabled || s.gold < i.price ? 'disabled' : ''}>${L('Satın al', 'Buy')} · ${i.price} 🪙</button>`;
+  } else {
+    if (i.own === 'swallow') btns = `<button class="btn" data-act="itemuse" data-id="swallow" ${n < 1 || s.hp >= E.maxHp() || ci.mode === 'recover' ? 'disabled' : ''}>🧪 ${L('İç', 'Drink')} · +${ci.potionHeal} ${L('can', 'HP')}</button>`;
+    else if (i.own === 'blackblood') btns = `<button class="btn" data-act="itemuse" data-id="blackblood" ${n < 1 ? 'disabled' : ''}>🩸 ${L('İç', 'Drink')}</button>`;
+    else if (i.own?.startsWith('thunder')) btns = `<button class="btn" data-act="itemuse" data-id="${i.own}" ${n < 1 ? 'disabled' : ''}>⚡ ${L('İç', 'Drink')}</button>`;
+    else if (i.own === 'dancing') btns = `<button class="btn" data-act="itemuse" data-id="dancing" ${n < 1 || !s.contract || ci.mode === 'recover' || ci.dancingWait > 0 ? 'disabled' : ''}>✴ ${ci.dancingWait > 0 ? `⏳ ${fmtDur(ci.dancingWait)}` : `${L('At', 'Throw')} · ${ci.dancingMin}–${ci.dancingMax}`}</button>`;
+    else if (i.own === 'honey') btns = `<span class="muted">${L('Kaçırılan bir günde kendiliğinden içilir.', 'Drunk automatically on a missed day.')}</span>`;
+  }
+  openModal(`<div class="item-detail">
+    ${cardHtml({ a: i.art, n: i.name, r: i.r }, { q: 'medium', noAct: true, locked: i.locked })}
+    <h2>${esc(i.name)}</h2>
+    ${artistSlot(i.art)}
+    <p>${esc(i.desc)}</p>
+    ${i.own ? `<p class="muted">${L('Elinde', 'You have')}: <b>${n}</b></p>` : ''}
+    ${i.id === 'mutagen' ? `<p class="muted">${E.oddLeft().length ? L(`İçinde hâlâ ${E.oddLeft().length} sürpriz var.`, `${E.oddLeft().length} surprise(s) still inside.`) : L('Tükendi: içinden çıkabilecek her şey çıktı.', 'Sold out: everything that could come out has.')}</p>` : ''}
+    <div class="row" style="justify-content:center">${btns}<button class="btn ghost" data-act="close">${L('Kapat', 'Close')}</button></div></div>`, 'item-modal');
+}
+
+/* ---------- Mysterious Puzzle Box: bilmece + kasa açma ---------- */
+function showPuzzle() {
+  const q = E.puzzleQuestion(); if (!q) return;
+  const ask = q.kind === 'art'
+    ? `<div class="puzzle-art">${imgTag(ART(q.a, 'medium'))}</div><p>${L('Bu kartın adı ne?', "What is this card's name?")}</p>`
+    : `<p class="flavor puzzle-flavor">“${esc(q.flavor)}”</p><p>${L('Bu söz topladığın kartlardan birine ait. Hangi kart?', 'These words belong to one of the cards you have collected. Which card?')}</p>`;
+  openModal(`<div class="puzzle"><h2>🧩 Mysterious Puzzle Box</h2>${ask}
+    <p class="muted">${L('Adından tek bir kelimeyi bile doğru yazman yeterli (büyük/küçük harf önemli değil). Tek hakkın var.', "Getting even one word of the name right is enough (case doesn't matter). You get one try.")}</p>
+    ${q.until ? `<div class="puzzle-timer" id="puzzleTimer"><div class="fill"></div><span></span></div>` : ''}
+    <input id="puzzleIn" type="text" autocomplete="off" placeholder="${L('Kartın adı…', 'Card name…')}" value="${esc(puzzleDraft)}">
+    <div class="row" style="justify-content:center"><button class="btn" data-act="puzzleanswer">${L('Cevapla', 'Answer')}</button>
+      <button class="btn ghost" data-act="close" title="${L('Süre işlemeye devam eder; sağ alttaki düğmeden geri dönersin.', 'The clock keeps running; come back with the button at the bottom right.')}">${L('Kartlarıma bak', 'Check my cards')}</button></div></div>`, 'item-modal');
+  const inp = $('#puzzleIn'); inp.focus(); inp.oninput = () => { puzzleDraft = inp.value; }; inp.onkeydown = e => { if (e.key === 'Enter') answerPuzzle(); };
+  puzzleTick();
+}
+/* geri sayım: pencere açıkken çubuk; kapalıyken sağ altta "bilmeceye dön" düğmesi. Süre bitince yazılan cevap gönderilir. */
+let puzzleDraft = '', puzzleTimerId = null;
+function puzzleTick() {
+  clearTimeout(puzzleTimerId);
+  const q = E?.puzzleQuestion(), fl = $('#puzzleFloat');
+  if (!q || !q.until) { fl?.remove(); return; }
+  const left = Math.max(0, new Date(q.until) - now()), secs = Math.ceil(left / 1000), total = DATA.PUZZLE.secs * 1000;
+  const bar = $('#puzzleTimer');
+  if (bar) {
+    fl?.remove();
+    bar.querySelector('.fill').style.width = `${left / total * 100}%`; bar.classList.toggle('low', secs <= 10);
+    bar.querySelector('span').textContent = `⏳ ${secs} ${L('sn', 's')}`;
+    if (left <= 0) { answerPuzzle(); return; }
+  } else if (left <= 0) {
+    if (!modalOpen()) { answerPuzzle(); return; }
+  } else {
+    let f = fl;
+    if (!f) { f = document.createElement('button'); f.id = 'puzzleFloat'; f.className = 'btn puzzle-float'; f.dataset.act = 'puzzleopen'; document.body.appendChild(f); }
+    f.classList.toggle('low', secs <= 10); f.textContent = `🧩 ${secs} ${L('sn', 's')} · ${L('Bilmeceye dön', 'Back to the riddle')}`;
+  }
+  puzzleTimerId = setTimeout(puzzleTick, 250);
+}
+const PRIZE_TIER = ['t-blue', 't-purple', 't-pink', 't-gold'];
+const prizeTile = p => `<div class="prize ${PRIZE_TIER[p.tier]}">${p.id === 'keg' || p.id === 'bigkeg' ? imgTag(ART(1484, 'low')) : `<span class="prize-ico">${p.id === 'gold' ? '🪙' : '✦'}</span>`}<b>${esc(E.prizeName(p))}</b></div>`;
+function answerPuzzle() {
+  const r = E.answerPuzzle($('#puzzleIn')?.value ?? puzzleDraft);
+  if (r.err) { toast(r.err, 'bad'); return; }
+  puzzleDraft = ''; clearTimeout(puzzleTimerId); $('#puzzleFloat')?.remove();
+  save(); render();
+  if (!r.correct) {
+    openModal(`<div class="puzzle"><h2>🔒 ${L('Kutu açılmadı', 'The box stayed shut')}</h2><p>${L('Doğru cevap', 'The answer was')}: <b>${esc(r.name)}</b></p>
+      ${r.late ? `<p class="muted">⏳ ${L('Süre doldu.', 'Time ran out.')}</p>` : ''}
+      <div class="row" style="justify-content:center"><button class="btn" data-act="puzzledone">${L('Tamam', 'OK')}</button></div></div>`, 'item-modal');
+    return;
+  }
+  /* kasa şeridi: rastgele ödüller (sadece görsel), kazanan WIN. sırada */
+  const tiers = DATA.PUZZLE.tiers, wOf = t => (st().school === 'cat' ? t.wCat ?? t.w : t.w), tot = tiers.reduce((t, x) => t + wOf(x) * x.prizes.length, 0);
+  const fake = () => { let x = Math.random() * tot; for (const [ti, t] of tiers.entries()) for (const p of t.prizes) { x -= wOf(t); if (x < 0) return { ...p, tier: ti }; } return { ...tiers[0].prizes[0], tier: 0 }; };
+  const WIN = 42, strip = Array.from({ length: WIN + 6 }, (_, i) => (i === WIN ? r.prize : fake()));
+  openModal(`<div class="puzzle"><h2>✔ ${esc(r.name)}</h2><p class="muted">${L('Doğru! Kutu açılıyor…', 'Correct! The box is opening…')}</p>
+    <div class="case"><div class="case-strip" id="caseStrip">${strip.map(prizeTile).join('')}</div><div class="case-line"></div></div>
+    <p id="caseResult" class="case-result">&nbsp;</p>
+    <div class="row" style="justify-content:center"><button class="btn" data-act="puzzledone" id="caseOk" disabled>${L('Devam', 'Continue')}</button></div></div>`, 'case-modal');
+  const el = $('#caseStrip'), tile = el.children[0].getBoundingClientRect().width + 8, view = el.parentElement.clientWidth;
+  const target = WIN * tile + tile / 2 - view / 2 + (Math.random() - 0.5) * tile * 0.6;
+  requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = 'transform 5.5s cubic-bezier(.12,.75,.2,1)'; el.style.transform = `translateX(${-target}px)`; }));
+  setTimeout(() => { el.children[WIN].classList.add('won'); $('#caseResult').innerHTML = `${L('Kazandın', 'You won')}: <b>${esc(E.prizeName(r.prize))}</b>`; $('#caseOk').disabled = false; playSound('level'); }, 5700);
+}
+
+/* kılıç kartları: demirci (satın al) ve Eşyalarım (kuşan / yükselt / erit) ortak kullanır */
+function swordKit() {
   const s = st(), lvNow = s.level;
   const typeName = w => (w.type === 'silver' ? L('Gümüş', 'Silver') : L('Çelik', 'Steel'));
   /* kılıcın gücü: sahip olunan kılıçta kendi seviyesinde, satılıkta senin seviyende */
@@ -817,8 +1044,8 @@ function renderShop() {
   const uniqTxt = w => { const u = w.unique && DATA.UNIQUE_BY_ID[w.unique]; return u ? `<small class="unique ${w.tier === 6 ? 'aero' : ''}">✦ <b>${esc(u.name)}</b>: ${esc(u.desc)}</small>` : ''; };
   const tag = w => (w.tier === 6 ? `<span class="rare-tag r2">${L('✦ Çok nadir', '✦ Very rare')}</span>` : w.tier === 4 ? `<span class="rare-tag r1">${L('✦ Efsanevi', '✦ Legendary')}</span>` : '');
   const glow = w => (w.tier === 6 ? 'rare r2' : w.tier === 4 ? 'rare r1' : '');
-  const swordCard = (w, mode) => {
-    const eq = s.swords[w.type] === w.id, lv = mode === 'own' ? E.swordLv(w.id) : lvNow;
+  const swordCard = (w, mode, lvView) => {
+    const eq = s.swords[w.type] === w.id, lv = mode === 'own' ? E.swordLv(w.id) : lvView ?? lvNow;
     let foot;
     if (mode === 'own') {
       const c = E.upgradeCost(w.id), dv = E.dismantleValue(w.id);
@@ -827,6 +1054,10 @@ function renderShop() {
         : `<span class="badge" title="${L('Kılıcın seviyesi senin seviyeni geçemez. Seviye atlayınca yükseltebilirsin.', "A sword can't go above your level. Level up to upgrade it.")}">${L('Seviyende', 'At your level')}</span>`;
       const more = eq ? '' : `<button class="btn sm ghost" data-act="dismantle" data-id="${w.id}" title="${L(`Erit: ${dv.gold} oren, ${dv.scraps} kırıntı geri gelir`, `Dismantle: get back ${dv.gold} crowns, ${dv.scraps} scraps`)}">🔥 ${L('Erit', 'Dismantle')}</button>`;
       foot = (eq ? `<span class="badge gold">${L('Kuşanıldı', 'Equipped')}</span>` : `<button class="btn sm" data-act="equip" data-id="${w.id}">${L('Kuşan', 'Equip')}</button>`) + up + more;
+    } else if (mode === 'view') {   // katalog: sadece inceleme
+      const has = s.swords.owned.includes(w.id);
+      foot = (w.set ? `<span class="muted">📜 ${L('Şemayla yaptırılır', 'Crafted from a diagram')}</span>` : w.tier === 6 ? `<span class="muted">${L('Satılmaz', 'Not sold')}</span>`
+        : `<span class="price" title="${L(`Seviye ${lv} demirci fiyatı`, `Blacksmith price at level ${lv}`)}">${E.shopPrice(w, lv)} 🪙</span>`) + (has ? `<span class="badge gold">${L('Sende', 'Owned')}</span>` : '');
     } else {
       const price = E.shopPrice(w);
       foot = `<span class="price">${price} 🪙</span><button class="btn sm" data-act="buysword" data-id="${w.id}" ${s.gold < price ? 'disabled' : ''}>${L('Satın al', 'Buy')}</button>`;
@@ -846,27 +1077,63 @@ function renderShop() {
       <small>${bonusTxt(w, lvNow)}</small>${w.bane ? `<small class="bane">⚔ ${baneTxt(w)}</small>` : ''}
       <div class="row" style="justify-content:space-between;margin-top:6px"><span class="price">${c.gold} 🪙 ${c.scraps} ✦</span>
         <button class="btn sm" data-act="craftsword" data-id="${w.id}" ${s.gold < c.gold || s.scraps < c.scraps ? 'disabled' : ''}>${L('Yaptır', 'Craft')}</button></div></div></div>`; };
+  return { swordCard, diagramCard, owned, diagrams, typeName, bonusTxt, baneTxt };
+}
+
+/* ---------- kılıç kataloğu: bütün kılıçlar, seçilen seviyedeki değerleriyle (sadece inceleme) ---------- */
+const catalog = { type: 'silver', lv: null, tier: 'all' };
+function showCatalog() {
+  const s = st(), lv = catalog.lv ?? s.level, { swordCard } = swordKit();
+  const tiers = [['all', L('Hepsi', 'All')], ...[1, 2, 3, 4].map(t => [String(t), SWORD_TIERS[t].name]), ['set', L('Okul seti', 'School set')], ['6', SWORD_TIERS[6]?.name || 'Aerondight']];
+  const list = SWORDS.filter(w => w.type === catalog.type && (catalog.tier === 'all' || (catalog.tier === 'set' ? w.set : !w.set && String(w.tier) === catalog.tier)))
+    .sort((a, b) => E.swordValue(b, lv) - E.swordValue(a, lv) || a.name.localeCompare(b.name));
+  const opt = (k, v, cur, label) => `<button class="btn sm ${cur === v ? '' : 'ghost'}" data-act="catset" data-k="${k}" data-v="${v}">${label}</button>`;
+  openModal(`<div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">🔍 ${L('Bütün kılıçlar', 'All swords')} <small class="muted">· ${list.length}</small></h2>
+      <button class="btn ghost" data-act="close">${L('Kapat', 'Close')}</button></div>
+    <p class="muted">${L('Sadece inceleme içindir. Değerler ve fiyatlar seçtiğin seviyeye göre hesaplanır; demirci bugün bunların ancak birkaçını satar.', "For browsing only. Stats and prices are computed for the level you pick; the blacksmith sells only a few of these each day.")}</p>
+    <div class="filters">${opt('type', 'silver', catalog.type, L('Gümüş', 'Silver'))}${opt('type', 'steel', catalog.type, L('Çelik', 'Steel'))}
+      <label class="row" style="gap:6px">${L('Seviye', 'Level')} <select id="catLv">${Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map(l => `<option value="${l}" ${l === lv ? 'selected' : ''}>${l}${l === s.level ? L(' (sen)', ' (you)') : ''}</option>`).join('')}</select></label></div>
+    <div class="filters">${tiers.map(([v, label]) => opt('tier', v, catalog.tier, label)).join('')}</div>
+    <div class="sword-grid">${list.map(w => swordCard(w, 'view', lv)).join('') || `<p class="muted">${L('Bu seçimde kılıç yok.', 'No swords match.')}</p>`}</div>`, 'wide');
+  $('#catLv').onchange = e => { catalog.lv = +e.target.value; showCatalog(); };
+}
+
+/* ---------- tüccar + demirci ---------- */
+function renderShop() {
+  const s = st(), lvNow = s.level, { swordCard, diagramCard, diagrams } = swordKit();
   const odds = rarityOdds(lvNow);
   const tomorrow = new Date(now()); tomorrow.setHours(24, 0, 0, 0);
   $('#shopPanel').innerHTML = `<h2>${L('Tüccar', 'Merchant')}</h2>
-    <div class="shop-grid">${E.shopItems().map(i => `<div class="shop-item"><h3>${i.name}</h3><div class="muted">${i.desc}</div>
-      <div class="row" style="justify-content:space-between;margin-top:auto"><span class="price">${i.price} 🪙</span>
-      <button class="btn" data-act="buy" data-id="${i.id}" ${i.disabled || s.gold < i.price ? 'disabled' : ''}>${L('Satın al', 'Buy')}</button></div></div>`).join('')}</div>
+    <p class="muted">${L('Bir karta tıklayınca büyür; özelliği ve fiyatı altında yazar. Aldıkların Eşyalarım sekmesinde durur.', 'Click a card to enlarge it; its effect and price are shown below. What you buy is kept in the My Items tab.')}</p>
+    <div class="item-grid">${E.shopItems().map(i => itemCard(i, 'shop')).join('')}</div>
     <div class="row" style="justify-content:space-between;margin-top:26px"><h2 style="margin:0">${L('Demirci', 'Blacksmith')} <small class="muted">· ${L(`bugünün kılıçları, ${fmtDur(tomorrow - now())} sonra kendiliğinden yenilenir`, `today's swords, restocks by itself in ${fmtDur(tomorrow - now())}`)}</small></h2>
-      <button class="btn" data-act="rerollshop" ${s.gold < E.shopRerollCost() ? 'disabled' : ''}>🔁 ${L('Stoğu yenile', 'Restock')} · ${E.shopRerollCost()} 🪙</button></div>
+      <div class="row" style="gap:8px"><button class="btn ghost" data-act="catalog">🔍 ${L('Bütün kılıçlar', 'All swords')}</button>
+      <button class="btn" data-act="rerollshop" ${s.gold < E.shopRerollCost() ? 'disabled' : ''}>🔁 ${L('Stoğu yenile', 'Restock')} · ${E.shopRerollCost()} 🪙</button></div></div>
     <p class="muted">${L(`Demirci her gün ${SHOP_DAILY} gümüş ve ${SHOP_DAILY} çelik kılıç getirir; hepsi <b>senin seviyende</b> (${lvNow}) gelir. <b>Gümüş</b> saatlik vuruşuna hasar ekler, <b>çelik</b> kritik vuruş şansı verir (×${CRIT_MULT}). Kılıcın gücü seviyesine ve kademesine bağlı; seviye şartı yok. Elindeki kılıcın seviyesini oren ve kırıntıyla yükseltebilirsin (en fazla kendi seviyene kadar). Kırıntı tekrar gelen kartlardan ve kazandığın her dövüşten (+${SCRAP_PER_KILL}) gelir. Her kılıç canavar türlerine karşı avcıdır: Sıradan 1, Usta işi 2, Büyülü 3 türe +%15; Efsanevi 3 türe +%25 (okul seti 4 türe +%20, Kadim 5 türe +%25). Okul setleri satılmaz: Lyria ve Vizima'dan itibaren bölge boss'ları şemalarını düşürür, demircide senin seviyende yaptırırsın; kendi okulunun seti ekstra bonus verir. Aerondight ${AERONDIGHT.minLevel}. seviyeden sonra çok nadiren çıkar.`,
       `Every day the blacksmith brings ${SHOP_DAILY} silver and ${SHOP_DAILY} steel swords, all at <b>your level</b> (${lvNow}). <b>Silver</b> adds damage to your hourly hit, <b>steel</b> gives a critical hit chance (×${CRIT_MULT}). A sword's power depends on its level and rarity; there are no level requirements. Raise the level of a sword you own with crowns and scraps (up to your own level). Scraps come from duplicate cards and from every fight you win (+${SCRAP_PER_KILL}). Every sword is a bane to monster types: Common 1, Masterwork 2, Magic 3 types at +15%; Legendary 3 types at +25% (school set 4 at +20%, Ancient 5 at +25%). School sets aren't sold: from Lyria and Vizima on, region bosses drop their diagrams and the blacksmith crafts them at your level; your own school's set gives an extra bonus. Aerondight shows up very rarely after level ${AERONDIGHT.minLevel}.`)}</p>
     <p class="odds" title="${L('Demircideki her kılıcın kademesi bu olasılıklarla belirlenir; seviyen arttıkça iyi kademeler artar.', "Each sword's rarity at the blacksmith is rolled with these odds; better rarities grow with your level.")}">🎲 ${L(`Seviye ${lvNow} olasılıkları`, `Odds at level ${lvNow}`)}: ${[1, 2, 3, 4].map(t => `<span class="tier-name t${t}">${SWORD_TIERS[t].name} ${L(`%${odds[t]}`, `${odds[t]}%`)}</span>`).join(' · ')}</p>
     <h3>${L('Gümüş', 'Silver')}</h3><div class="sword-grid">${E.dailySwords('silver').map(w => swordCard(w, 'buy')).join('') || `<p class="muted">${L('Satılık gümüş kılıç kalmadı.', 'No silver swords left for sale.')}</p>`}</div>
     <h3>${L('Çelik', 'Steel')}</h3><div class="sword-grid">${E.dailySwords('steel').map(w => swordCard(w, 'buy')).join('') || `<p class="muted">${L('Satılık çelik kılıç kalmadı.', 'No steel swords left for sale.')}</p>`}</div>
     ${diagrams.length ? `<h2 style="margin-top:26px">${L('Şemalar', 'Diagrams')} · ${diagrams.length}</h2><div class="sword-grid">${diagrams.map(diagramCard).join('')}</div>` : ''}
-    <h2 style="margin-top:26px">${L('Kılıçların', 'Your swords')} · ${owned.length} / ${SWORDS.length}</h2>
+`;
+}
+
+
+function renderItems() {
+  const s = st(), { swordCard, owned } = swordKit();
+  const items = E.shopItems().filter(i => i.own && itemOwned(i) > 0);
+  $('#itemsPanel').innerHTML = `<h2>${L('Eşyalarım', 'My Items')}</h2>
+    <h3>${L('İksirler ve bombalar', 'Potions and bombs')}</h3>
+    ${items.length ? `<div class="item-grid">${items.map(i => itemCard(i, 'own')).join('')}</div>` : `<p class="muted">${L('Hiç iksirin yok. Tüccardan alabilirsin.', 'You have no potions. The merchant sells them.')}</p>`}
+    ${(s.oddities || []).length ? `<div class="row" style="justify-content:space-between;align-items:center;margin-top:26px"><h3 style="margin:0">🧬 ${L('Tuhaf eşyalar', 'Oddities')} · ${s.oddities.length} / ${DATA.ODDITIES.length}</h3>${oddToggle()}</div>
+      ${oddShown() ? `<div class="item-grid">${s.oddities.map(odd).filter(Boolean).map(oddCard).join('')}</div>` : ''}` : ''}
+    <h3 style="margin-top:26px">${L('Kılıçların', 'Your swords')} · ${owned.length} / ${SWORDS.length}</h3>
     <p class="muted">${L(`Kılıcın seviyesini yükseltmenin bedeli, yeni seviyedeki fiyatının %${SWORD_UP.goldShare * 100}'i kadar oren ve biraz kırıntıdır. Kuşanmadığın kılıcı eritirsen fiyatının %${DISMANTLE.gold * 100}'i ve seviyesinin yarısı kadar kırıntı geri gelir.`,
       `Raising a sword's level costs ${SWORD_UP.goldShare * 100}% of its price at the new level in crowns, plus some scraps. Dismantling an unequipped sword returns ${DISMANTLE.gold * 100}% of its price and scraps equal to half its level.`)}</p>
     ${owned.length ? `<div class="sword-grid">${owned.map(w => swordCard(w, 'own')).join('')}</div>` : `<p class="muted">${L('Henüz kılıcın yok.', 'You have no swords yet.')}</p>`}`;
 }
 
-/* ---------- Okul: karakter salonu + yeniden doğuş ---------- */
+/* ---------- Karakterlerim: eski karakterler + yeniden doğuş ---------- */
 function charSummary(c, current) {
   const kills = c.trophies.length, bosses = c.trophies.filter(t => monById(t.id)?.boss).length;
   const links = c.links.filter(l => l.cards.length >= LINK_SIZE).length;
@@ -883,15 +1150,97 @@ function charSummary(c, current) {
 function renderHall() {
   const s = st();
   const cur = { ...E.snapshot(), swords: s.swords.owned, end: null };
-  $('#hallPanel').innerHTML = `<h2>${L('Okul', 'School')}</h2>
-    <p class="muted">${L("Yeniden doğduğunda bu karakter Okul'a kalıcı olarak eklenir: seviyesi, kartları, bağları, kılıçları ve öldürdüğü canavarlar burada saklanır. Yeni karakter sıfırdan başlar ve yeni bir fraksiyona odaklanır. Ana görev, zincir, yan görevler ve kayıtlar karakterden bağımsızdır, olduğu gibi kalır.", "When you're reborn, this character joins the School for good: its level, cards, links, swords and slain monsters are kept here. The new character starts from scratch with a new faction focus. The main quest, chain, side quests and records don't belong to the character and stay as they are.")}</p>
-    ${(() => { const lg = E.legacy(); return `<div class="box"><b>🏛 ${L('Okul mirası', 'School legacy')}:</b> ${L(`${lg.legends} efsane, ${lg.chars} karakter`, `${lg.legends} legends, ${lg.chars} characters`)} →
+  $('#hallPanel').innerHTML = `<h2>${L('Karakterlerim', 'My Characters')}</h2>
+    <p class="muted">${L("Yeniden doğduğunda bu karakter buraya kalıcı olarak eklenir: seviyesi, kartları, bağları, kılıçları ve öldürdüğü canavarlar burada saklanır. Yeni karakter sıfırdan başlar ve yeni bir fraksiyona odaklanır. Ana görev, zincir, yan görevler ve kayıtlar karakterden bağımsızdır, olduğu gibi kalır.", "When you're reborn, this character is added here for good: its level, cards, links, swords and slain monsters are kept here. The new character starts from scratch with a new faction focus. The main quest, chain, side quests and records don't belong to the character and stay as they are.")}</p>
+    ${(() => { const lg = E.legacy(); return `<div class="box"><b>🏛 ${L('Miras', 'Legacy')}:</b> ${L(`${lg.legends} efsane, ${lg.chars} karakter`, `${lg.legends} legends, ${lg.chars} characters`)} →
       <span class="mult">${L(`+%${lg.gold} oren`, `+${lg.gold}% crowns`)}</span>, <span class="mult">${L(`+%${lg.xp} TP`, `+${lg.xp}% XP`)}</span> <small class="muted">${L(`(her efsane +%${LEGACY.goldPerLegend} oren, en çok %${LEGACY.goldMax}; her karakter +%${LEGACY.xpPerChar} TP, en çok %${LEGACY.xpMax})`, `(each legend +${LEGACY.goldPerLegend}% crowns, up to ${LEGACY.goldMax}%; each character +${LEGACY.xpPerChar}% XP, up to ${LEGACY.xpMax}%)`)}</small></div>`; })()}
     ${charSummary(cur, true)}
     <div class="row" style="margin:12px 0 24px"><button class="btn ${s.legend ? '' : 'ghost'}" data-act="rebirth">♻ ${L('Yeniden doğ', 'Be reborn')}</button>
       <small class="muted">${s.legend ? L('Son boss yenildi, yeni bir yola hazırsın. İstersen bu karakterle devam da edebilirsin.', 'The final boss is defeated; you are ready for a new path. You can also keep playing this character.') : L("İstediğin zaman yapabilirsin, ama genelde son boss'tan sonra yapılır.", "You can do it anytime, but it's usually done after the final boss.")}</small></div>
-    <h3>${L('Salon', 'Hall')} · ${L(`${s.hall.length} karakter`, `${s.hall.length} characters`)}</h3>
-    ${s.hall.length ? s.hall.slice().reverse().map(h => charSummary(h, false)).join('') : `<p class="muted">${L("Henüz Okul'a katılmış bir karakter yok.", 'No character has joined the School yet.')}</p>`}`;
+    <h3>${L('Eski karakterler', 'Past characters')} · ${L(`${s.hall.length} karakter`, `${s.hall.length} characters`)}</h3>
+    ${s.hall.length ? s.hall.slice().reverse().map(h => charSummary(h, false)).join('') : `<p class="muted">${L('Henüz yeniden doğmadın; eski karakterin yok.', "You haven't been reborn yet, so there are no past characters.")}</p>`}`;
+}
+/* ---------- Okullar: her okulun oynanışı ve hikâyesi ---------- */
+const SCHOOL_INFO = {
+  wolf: {
+    tag: ['Dengeli yol', 'The balanced path'],
+    mech: [
+      ['Zincirindeki her halka o alışkanlığın ödülünü (oren ve TP) %5 artırır, en çok +%50 (10 halka).', 'Every link in a chain raises that habit\'s reward (crowns and XP) by 5%, up to +50% (10 links).'],
+      ['Ceza ya da zayıflık yok: hasar aldığın oran, canın ve iyileşmen standart (avda saatte %0,3).', 'No drawbacks: damage taken, HP and healing are all standard (0.3% per hour while hunting).'],
+      ['Gümüş ve çelik kılıçla başlar: tek okul ikisini birden verir.', 'Starts with both a silver and a steel sword.'],
+    ],
+    lore: ['Kurt Okulu, Kaedwen\'in Mavi Dağları\'ndaki Kaer Morhen kalesinde yetişir. Kılıç ve İşaret\'i dengeli kullanmayı öğretir; ne aşırı ağır ne aşırı hafif zırh giyer. Kale bir zamanlar yüzlerce çırağı barındırırdı, ama cadı avı sırasında basılıp yıkıldı. Bugün içinde sadece bir avuç witcher kışı geçirir. Rivyalı Geralt ve hocası Vesemir bu okulun en tanınmış adlarıdır.',
+      'The School of the Wolf trains at Kaer Morhen, a keep in the Blue Mountains of Kaedwen. It teaches a balance of sword and Sign, in armour neither too heavy nor too light. The keep once housed hundreds of apprentices, until it was stormed and ruined during a witch hunt. Today only a handful of witchers winter there. Geralt of Rivia and his mentor Vesemir are its best-known names.'],
+  },
+  cat: {
+    tag: ['Kumarbaz', 'The gambler'],
+    mech: [
+      ['Canavar ödülleri (oren) ×1,3.', 'Monster rewards (crowns) ×1.3.'],
+      ['Ama aldığın hasar ×1,5 ve avda iyileşmen en yavaş (saatte %0,2).', 'But you take ×1.5 damage and heal slowest while hunting (0.2% per hour).'],
+      ['En çok orenle (180) ve 20 kırıntıyla başlar; gümüş kılıcı yoktur, sadece çelik (kritik).', 'Starts with the most crowns (180) and 20 scraps; no silver sword, only steel (crits).'],
+    ],
+    lore: ['Kedi Okulu\'nun witcher\'ları hızlı, çevik ve hafif zırhlıdır. Okulun mutasyonları dengesiz witcher\'lar yetiştirmekle ün salmıştır; çoğu canavar avcılığından çok paralı askerlik ve suikastla anılır. Sabit bir kaleleri olmadığı, kervanlarla dolaştıkları söylenir. Kıta\'nın çoğu yerinde onlara güvenilmez, ama iyi para ödeyene her işi yaptıkları bilinir.',
+      'Witchers of the Cat School are fast, agile and lightly armoured. Its mutations are infamous for producing unstable witchers, and most of them are remembered as mercenaries and assassins rather than monster hunters. They are said to have no fixed keep and to roam with caravans. Across most of the Continent they are not trusted, but it is known that they will take any job for good coin.'],
+  },
+  bear: {
+    tag: ['Dayanıklı', 'The enduring'],
+    mech: [
+      ['Canın ×1,4 ve aldığın hasar ×0,6.', 'HP ×1.4 and damage taken ×0.6.'],
+      ['Avda en hızlı iyileşen okul (saatte %0,5); yenilince saatte %30 toparlanır (diğerleri %15).', 'The fastest healer while hunting (0.5% per hour); recovers 30% per hour after a defeat (others 15%).'],
+      ['Az orenle (70) ama 2 Mahakam Ale ile başlar.', 'Starts with few crowns (70) but 2 Mahakam Ale.'],
+    ],
+    lore: ['Ayı Okulu\'nun kalesi Haern Caduch, Skellige adalarının sert dağlarında durur. Bu witcher\'lar ağır zırh giyer ve kaçmak yerine darbeyi göğüsleyip karşılık vermeyi öğrenir. Yalnızlığı sever, kalabalıktan ve şehirlerden uzak dururlar. Ayılar kolay kolay yenilmez; yenildiklerinde de herkesten önce ayağa kalkarlar.',
+      'The Bear School\'s keep, Haern Caduch, stands in the harsh mountains of the Skellige Isles. Its witchers wear heavy armour and learn to take a blow and strike back instead of dodging. They love solitude and keep away from crowds and cities. Bears are not easily beaten, and when they are, they are the first back on their feet.'],
+  },
+  griffin: {
+    tag: ['Disiplinli', 'The disciplined'],
+    mech: [
+      ['Kırılan zincir için kefaret 2 yerine 1 gün.', 'Atonement for a broken chain takes 1 day instead of 2.'],
+      ['Gecikince Yorgun, kaçırınca Bitkin olmazsın (canavar yine vurur).', 'You never become Tired when late or Exhausted when you miss (the monster still strikes).'],
+      ['40 kırıntı ve 2 Mahakam Ale ile başlar; sadece gümüş kılıç.', 'Starts with 40 scraps and 2 Mahakam Ale; silver sword only.'],
+    ],
+    lore: ['Grifon Okulu, Kovir kıyısında, denize bakan uçurumların üstündeki Kaer Seren\'de kuruldu. İşaret\'lere ve zihin disiplinine diğer okullardan çok önem verir; witcher\'ları bir şövalye gibi sözüne sadık olmakla bilinir. Kale çoktan terk edildi, ama Grifon\'lar yemine bağlılıklarını sürdürdü. Kurt Okulu\'nda kış geçiren Poviss\'li Coën bu okulda yetişmişti.',
+      'The Griffin School was founded at Kaer Seren, atop sea cliffs on the coast of Kovir. It values Signs and discipline of the mind more than any other school, and its witchers are known to keep their word like knights. The keep was abandoned long ago, but the Griffins kept their oath. Coën of Poviss, who wintered with the Wolves, was trained there.'],
+  },
+  viper: {
+    tag: ['Dakik', 'The punctual'],
+    mech: [
+      ['Görevi erken yaparsan (saatli türlerde aralığın ilk 10 dakikası, diğerlerinde öğleden önce) o günün ödülü ×1,4.', 'Do a quest early (first 10 minutes of the window for timed types, before noon for the others) for ×1.4 rewards that day.'],
+      ['Erken bitirince 24 saat Odak: hasar +%10.', 'Finishing early also gives 24 hours of Focus: +10% damage.'],
+      ['Avda iyileşmesi biraz yavaş (saatte %0,25).', 'Heals a little slower while hunting (0.25% per hour).'],
+    ],
+    lore: ['Engerek Okulu güneyde, imparatorluğun gölgesinde yetişti ve Nilfgaard ile en yakın bağı olan okul oldu. Witcher\'ları iki kısa kılıçla, zehir ve sabırla savaşır; hedeflerini günlerce bekleyip doğru anda vururlar. Krallar arasında "kral katili" diye anılan Guletli Letho bir Engerek\'tir. Onlar için zamanlama her şeydir.',
+      'The Viper School grew in the south, in the shadow of the Empire, and became the school most closely tied to Nilfgaard. Its witchers fight with two short blades, poison and patience, waiting days for their target and striking at the right moment. Letho of Gulet, known among kings as the Kingslayer, is a Viper. For them, timing is everything.'],
+  },
+  manticore: {
+    tag: ['Simyacı', 'The alchemist'],
+    mech: [
+      ['İksirleri (Swallow, Mahakam Ale, Thunderbolt, Petri’s Philter) yarı fiyatına alırsın; bombalar hariç.', 'Potions (Swallow, Mahakam Ale, Thunderbolt, Petri’s Philter) cost half; bombs excluded.'],
+      ['Dancing Star %30 daha sert vurur.', 'Dancing Star hits 30% harder.'],
+      ['Az orenle (80) ama 1 Thunderbolt ve 3 Dancing Star ile başlar.', 'Starts with few crowns (80) but 1 Thunderbolt and 3 Dancing Stars.'],
+    ],
+    lore: ['Mantikor Okulu, Kıta\'nın doğusundan, Zerrikanya\'nın çöllerinden geldiği söylenen gizemli bir okuldur. Witcher\'ları simyanın ustasıdır: iksirleri, yağları ve bombaları kendileri hazırlar, kılıçtan çok bu karışımlarla savaşırlar. Kuzey\'de çok nadir görülürler; teçhizatlarının şemaları Toussaint\'in harabelerinde bulunur. Haklarında bilinenler azdır ve öyle kalmasını isterler.',
+      'The Manticore School is a secretive school said to have come from the east of the Continent, from the deserts of Zerrikania. Its witchers are masters of alchemy: they brew their own potions, oils and bombs, and fight with these mixtures more than with the sword. They are rarely seen in the North; diagrams of their gear turn up among the ruins of Toussaint. Little is known about them, and they prefer it that way.'],
+  },
+};
+function renderSchools() {
+  const s = st();
+  const cats = id => (SCHOOL_CATS[id] || []).join(', ');
+  $('#schoolsPanel').innerHTML = `<h2>${L('Okullar', 'Schools')}</h2>
+    <p class="muted">${L(`Her witcher okulu oyunu farklı oynatır. Okulun yeni karakter oluştururken ya da yeniden doğarken seçilir; istersen bu sayfadan 150 orene değiştirebilirsin. Her okulda ayrıca: o okulun sevdiği kart türlerinden kurulan bağlar ×${LINK_SCHOOL} değerlidir, kendi okulunun set kılıcı +%15 hasar (çelikte +%3 kritik) verir ve boss şemaları önce kendi okulunun setinden düşer.`,
+      `Each witcher school plays differently. You pick one when you create a character or are reborn, and you can switch here for 150 crowns. In every school: card links in its favourite categories are worth ×${LINK_SCHOOL}, your own school's set swords give +15% damage (+3% crit on steel), and boss diagrams drop your own school's set first.`)}</p>
+    <div class="school-list">${Object.entries(SCHOOLS).map(([id, sch]) => { const info = SCHOOL_INFO[id] || {}, mine = id === s.school;
+      return `<div class="school-card ${mine ? 'mine' : ''}">
+        <div class="sc-img">${imgTag(DATA.schoolImg(id, 'medium'), sch.img ? 'top' : '')}</div>
+        <div class="sc-body">
+          <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><h3 style="margin:0">${esc(sch.name)} <small class="muted">· ${L(...(info.tag || ['', '']))}</small></h3>
+            ${mine ? `<span class="badge gold">${L('Senin okulun', 'Your school')}</span>` : `<button class="btn sm" data-act="switchschool" data-id="${id}" ${s.gold < 150 ? 'disabled' : ''}>${L('Bu okula geç', 'Switch to this school')} · 150 🪙</button>`}</div>
+          <h4>${L('Oynanış', 'Gameplay')}</h4>
+          <ul>${(info.mech || []).map(m => `<li>${L(...m)}</li>`).join('')}</ul>
+          <p class="muted"><b>${L('Sevdiği kart türleri', 'Favourite card categories')}:</b> ${esc(cats(id))} (${L(`bağlar ×${LINK_SCHOOL}`, `links ×${LINK_SCHOOL}`)})<br><b>${L('Başlangıç', 'Start')}:</b> ${kitText(id).replace(/^(Başlangıç|Start): /, '')}</p>
+          <h4>${L('Hikâyesi', 'Lore')}</h4>
+          <p class="lore">${L(...(info.lore || ['', '']))}</p>
+        </div></div>`; }).join('')}</div>`;
 }
 function showHallChar(id) {
   const h = st().hall.find(x => x.id === id); if (!h) return;
@@ -916,7 +1265,7 @@ function showHallChar(id) {
 function showRebirth() {
   pickSchool = st().school; pickFaction = st().faction ? (FACTIONS.find(f => f !== st().faction) || 'all') : FACTIONS[0];
   openModal(`<h2>♻ ${L('Yeniden doğuş', 'Rebirth')}</h2>
-    <p>${L(`<b>${esc(st().name)}</b> Okul'a kalıcı olarak eklenecek. Yeni karakter seviye 1'den, White Orchard'dan, boş koleksiyonla başlar. Ana görevin, zincirin, yan görevlerin ve kayıtların olduğu gibi kalır.`, `<b>${esc(st().name)}</b> will join the School for good. The new character starts at level 1 in White Orchard with an empty collection. Your main quest, chain, side quests and records stay as they are.`)}</p>
+    <p>${L(`<b>${esc(st().name)}</b> Karakterlerim'e kalıcı olarak eklenecek. Yeni karakter seviye 1'den, White Orchard'dan, boş koleksiyonla başlar. Ana görevin, zincirin, yan görevlerin ve kayıtların olduğu gibi kalır.`, `<b>${esc(st().name)}</b> will move to My Characters for good. The new character starts at level 1 in White Orchard with an empty collection. Your main quest, chain, side quests and records stay as they are.`)}</p>
     <label>${L('Yeni karakterin adı', "New character's name")}</label><input id="rbName" value="">
     <label>${L('Okul', 'School')}</label>${schoolGrid()}
     <label>${L('Odak fraksiyon (sadece bu fraksiyon + tarafsız kartlar düşer; istersen tümü)', 'Faction focus (only this faction + Neutral cards drop; or pick all)')}</label>${factionGrid()}
@@ -1087,11 +1436,15 @@ function render() {
   if (currentTab === 'links') renderLinks();
   if (currentTab === 'bestiary') renderBestiary();
   if (currentTab === 'shop') renderShop();
+  if (currentTab === 'items') renderItems();
+  if (currentTab === 'mini') renderMini();
   if (currentTab === 'hall') renderHall();
+  if (currentTab === 'schools') renderSchools();
   if (currentTab === 'history') renderHistory();
   if (currentTab === 'settings') { renderSettings(); renderAccess(); }
   if (currentTab === 'achievements') renderAchievements();
   renderDev();
+  puzzleTick();
 }
 function switchTab(tab) {
   currentTab = tab;
@@ -1153,8 +1506,8 @@ let pickSchool = 'wolf', pickFaction = 'Scoiatael';
 const schoolGrid = () => `<div class="schools">${Object.entries(SCHOOLS).map(([id, s]) => `<div class="school ${id === pickSchool ? 'sel' : ''}" data-act="pickschool" data-id="${id}">
   <div class="simg">${imgTag(DATA.schoolImg(id, 'low'), s.img ? 'top' : '')}</div><div class="sbody"><b>${s.name}</b>${s.desc}<small class="muted" style="display:block;margin-top:4px">${kitText(id)}</small></div></div>`).join('')}</div>`;
 const kitText = id => { const k = START_KIT[id], sw = [k.silver, k.steel].map(swordById).filter(Boolean).map(w => w.name).join(', ');
-  return L(`Başlangıç: ${k.gold} oren · ${k.swallow} Swallow · ${k.honey} White Honey${k.thunder ? ` · ${k.thunder} Thunderbolt` : ''}${k.dancing ? ` · ${k.dancing} Dancing Star` : ''}${k.scraps ? ` · ${k.scraps} kırıntı` : ''}${sw ? ` · ${sw}` : ''}`,
-    `Start: ${k.gold} crowns · ${k.swallow} Swallow · ${k.honey} White Honey${k.thunder ? ` · ${k.thunder} Thunderbolt` : ''}${k.dancing ? ` · ${k.dancing} Dancing Star` : ''}${k.scraps ? ` · ${k.scraps} scraps` : ''}${sw ? ` · ${sw}` : ''}`); };
+  return L(`Başlangıç: ${k.gold} oren · ${k.swallow} Swallow · ${k.honey} Mahakam Ale${k.thunder ? ` · ${k.thunder} Thunderbolt` : ''}${k.dancing ? ` · ${k.dancing} Dancing Star` : ''}${k.scraps ? ` · ${k.scraps} kırıntı` : ''}${sw ? ` · ${sw}` : ''}`,
+    `Start: ${k.gold} crowns · ${k.swallow} Swallow · ${k.honey} Mahakam Ale${k.thunder ? ` · ${k.thunder} Thunderbolt` : ''}${k.dancing ? ` · ${k.dancing} Dancing Star` : ''}${k.scraps ? ` · ${k.scraps} scraps` : ''}${sw ? ` · ${sw}` : ''}`); };
 const FACTION_ART = { Monster: 1652, Nilfgaard: 1285, 'Northern Realms': 2357, Scoiatael: 1189, Skellige: 2347, Syndicate: 1843 };
 const factionGrid = () => `<div class="schools">${FACTIONS.map(f => `<div class="school ${f === pickFaction ? 'sel' : ''}" data-act="pickfaction" data-id="${f}">
   <div class="simg">${imgTag(ART(FACTION_ART[f], 'low'))}</div><div class="sbody"><b>${facName(f)}</b>${L(`${CARDS.filter(c => c.f === f).length} kart + ${CARDS.filter(c => c.f === 'Neutral').length} tarafsız`, `${CARDS.filter(c => c.f === f).length} cards + ${CARDS.filter(c => c.f === 'Neutral').length} Neutral`)}</div></div>`).join('')}
@@ -1174,52 +1527,66 @@ function showOnboarding() {
 function showRules() {
   if (window.KM_LANG === 'en') return showRulesEn();
   openModal(`<h2>Nasıl oynanır?</h2>
-  <h3>Ana görev</h3>
-  <p>Edinmek istediğin tek bir alışkanlık. <b>Uyku düzeni</b>nde bir yatış, bir de kalkış aralığı vardır; <b>günlük alışkanlık</b>ta tek bir aralık. Aralığın içinde ne zaman yaptığın fark etmez. ${QUEST_MIN}–${QUEST_MAX} günlük bir hedef seçersin; o kadar başarılı gün biriktirince alışkanlık edinilir.</p>
+  <h3>Alışkanlıklar (ana görevler)</h3>
+  <p>Edinmek istediğin en fazla ${MAX_HABITS} alışkanlığı aynı anda takip edersin; her biri ayrı bir ana görevdir ve kendi zinciri vardır. Her biri için ${QUEST_MIN}–${QUEST_MAX} günlük bir hedef seçersin; o kadar başarılı gün biriktirince alışkanlık edinilir (Efsanevi kart, oren ve TP). Sonra istersen <b>ustalık yolunda</b> aynı zincirle devam edersin (ödüller ×${MASTERY_MULT}), istersen onu bırakıp yerine yenisini eklersin.</p>
+  <p>Dört tür alışkanlık var:</p>
+  <ul>
+   <li><b>Saat aralığı:</b> belirlediğin aralıkta yaparsın (ör. 07:00–08:00 spor). Aralıktan önce yapmak da sayılır.</li>
+   <li><b>Yaptım / yapmadım:</b> gün içinde herhangi bir saatte yapman yeter; gün gece ${DAY_END_UI}'e kadar sürer. İstersen alt görevler eklersin; hepsini işaretleyince gün tamamlanır.</li>
+   <li><b>Adet:</b> günlük bir hedef sayısı vardır (ör. 8 bardak su); hedefe ulaşınca gün başarılıdır. Gün sonunda hedefin yarısına ulaştıysan gecikme sayılır. Alt görevlerle de çalışır: "şu kadarını yap".</li>
+   <li><b>Uyku düzeni:</b> bir yatış ve bir kalkış aralığı vardır. Yatış aralığında meditasyona çekilmek sabahın ödülünü ×1,5 yapar ve +1 kart verir; asıl gün kalkışla sayılır.</li>
+  </ul>
   <h3>Her gün</h3>
-  <p><b>Yatış (uyku):</b> aralıkta meditasyon küçük ödül verir, sabahı ×1.5 ve +1 kart yapar. <b>Kalkış / görev:</b> aralıkta yaparsan başarı: kart, TP, oren ve zincirine bir halka. Aralık sonrası tolerans içinde yaparsan gecikme, hiç yapmazsan kaçırma.</p>
+  <p>Her alışkanlık her gün ayrı sayılır. Zamanında yaparsan <b>başarı</b>: kart, TP, oren ve zincirine bir halka (günün ilk başarısı 2 kart, sonrakiler 1). Aralıktan sonra, tolerans içinde yaparsan <b>gecikme</b>; hiç yapmazsan <b>kaçırma</b>. Haftada bir <b>dinlenme günü</b> ilan edebilirsin: o gün yaparsan ödül alırsın, yapmazsan ceza yok. Yan görevler küçük, tek seferlik işlerdir; az TP ve oren verir.</p>
   <h3>Kontratlar ve bölgeler</h3>
-  <p>Açık her bölgenin ilan panosuna her pazartesi ${BOARD_SIZE} canavar asılır. Haritadan istediğin bölgeden birini seçersin, başarılı günlerin ona hasar verir. Her canavarın canı ve ödülü farklıdır: canı az olanın ödülü de azdır. Ölünce oren, TP ve kart alırsın. Aynı canavar bu karakterle bir daha gelmez (efsane olduktan sonra elit olarak döner). Asıl TP canavarlardan gelir.</p>
+  <p>Açık her bölgenin ilan panosuna her pazartesi ${BOARD_SIZE} canavar asılır. Haritadan istediğin bölgeden birini seçersin; karakterin onunla saat başı dövüşür (aşağıdaki Av bölümü). Her canavarın canı ve ödülü farklıdır: canı az olanın ödülü de azdır. Ölünce oren, TP ve kırıntı alırsın; bazen canavarın kendi kartı da düşer. Aynı canavar bu karakterle bir daha gelmez (efsane olduktan sonra elit olarak döner). Asıl TP canavarlardan gelir.</p>
   <p>Kademeler: ${Array.from({ length: BAND_COUNT }, (_, b) => `${bandLabel(b)} (${b * 4 + 1}–${b * 4 + 4})`).join(' → ')}. Aynı kademedeki bölgeler birlikte açılır. Kademenin üst seviyesine gelince TP birikmeye devam eder (en fazla bir seviyelik), ama ilerlemek için kademenin boss'larından birini yenmen gerekir; diğer boss sonra da kesilebilir. Son boss'u yenen karakter efsane olur; istersen onunla devam edersin: canavarlar ve boss'lar elit olarak geri gelir, 32'den sonraki TP Ün (★) verir.</p>
   <h3>Hasar</h3>
   <p>Saat başı bir vuruş yaparsın: (seviye gücü + gümüş kılıç) × (1 + bonus). Gümüş kılıç hasar ekler, çelik kılıç kritik şansı verir (×1.5); güçleri kılıcın seviyesine ve kademesine bağlı. Zincir ana güç kaynağıdır: Çelik +%10, Gümüş +%20, Altın +%30, Mithril +%50, Göktaşı +%100. ${MULTI_CHAIN_TXT()} Zincir, kart bağı ve avcı bonusları düz toplanır; tavan yok. Kılıçlar demircide senin seviyende çıkar; seviyesini oren ve kırıntıyla kendi seviyene kadar yükseltebilirsin.</p>
   <h3>Av (idle)</h3>
-  <p>Karakterin kontrattaki canavarla sürekli dövüşür; uygulama kapalıyken de. Saatlik hasarın seviyenden, kılıçlarından, zincirlerinden ve kart bağlarından gelir. Canavar sana kendiliğinden vurmaz: bir görevi geciktirirsen yarım, kaçırırsan tam vurur (boss'lar daha sert). Can avdayken saatte yaklaşık %0,3 dolar (okula göre: Bear %0,5, Griffin %0,35, Wolf %0,3, Viper %0,25, Cat %0,2, Manticore %0,3); yenilip toparlanırken saatte %15 (Bear okulu %30). Kontrat hiç bitmez: istersen panodan başka bir kontrat seçersin (eskisinin ilerlemesi sıfırlanır), seçmezsen en kolay iş kendiliğinden alınır. Acil durumda Swallow içersin; Thunderbolt 12 saat hasarı +%20 artırır, Tawny Owl alınınca +10 TP verir, Dancing Star bombası canının %50'si karşılığında canavara rastgele 3–10 saatlik hasarın kadar vurur. Canın %50'nin altındayken Yaralısın: hasarın −%20. Can sıfırlanırsa yenilirsin: canavarın canı tamamen dolar, orenin %10'unu kaybedersin ve canın dolana kadar toparlanırsın. Kartlar avdan değil alışkanlıklardan gelir.</p>
+  <p>Karakterin kontrattaki canavarla sürekli dövüşür; uygulama kapalıyken de. Saatlik hasarın seviyenden, kılıçlarından, zincirlerinden ve kart bağlarından gelir. Canavar sana kendiliğinden vurmaz: bir görevi geciktirirsen yarım, kaçırırsan tam vurur (boss'lar daha sert). Can avdayken saatte yaklaşık %0,3 dolar (okula göre: Bear %0,5, Griffin %0,35, Wolf %0,3, Viper %0,25, Cat %0,2, Manticore %0,3); yenilip toparlanırken saatte %15 (Bear okulu %30). Kontrat hiç bitmez: istersen panodan başka bir kontrat seçersin (eskisinin ilerlemesi sıfırlanır), seçmezsen en kolay iş kendiliğinden alınır. Acil durumda Swallow içersin: en yüksek canının %50'sini doldurur. Thunderbolt 24 saat hasarı +%20 artırır (Gelişmiş +%30 13. seviyeden, Üstün +%40 25. seviyeden; üst üste binmez). Petri’s Philter alınınca TP verir (+10 / +20 / +35; günde en fazla bir tane). Dancing Star bombası canavara rastgele 3–10 saatlik hasarın kadar vurur; attıktan sonra 48 saat yenisini atamazsın. Canın %50'nin altındayken Yaralısın: hasarın −%20. Can sıfırlanırsa yenilirsin: canavarın canı tamamen dolar, orenin %10'unu kaybedersin ve canın dolana kadar toparlanırsın. Kartlar avdan değil alışkanlıklardan gelir.</p>
   <h3>Cezalar</h3>
-  <p>Gecikmek canavarın yarım vuruşu ve 12 saat "Yorgun" (hasar −%15), kaçırmak tam vuruş ve 24 saat "Bitkin" (−%30) demektir; cezalar birikir ama en çok −%60 olur. White Honey kaçırılan bir günde kendiliğinden içilir: canavar vuramaz, Bitkin olmazsın. Griffin okulu ne Yorgun ne Bitkin olur.</p>
+  <p>Gecikmek canavarın yarım vuruşu ve 12 saat "Yorgun" (hasar −%15), kaçırmak tam vuruş ve 24 saat "Bitkin" (−%30) demektir; cezalar birikir ama en çok −%60 olur. Mahakam Ale kaçırılan bir günde kendiliğinden içilir: Bitkin olmazsın. Griffin okulu ne Yorgun ne Bitkin olur.</p>
   <h3>Zincir</h3>
   <ul>
-   <li>Her başarılı gün bir halka: <b>Demir → Çelik (7) → Gümüş (14) → Altın (30) → Göktaşı (60)</b>.</li>
+   <li>Her başarılı gün bir halka: <b>Demir → Çelik (7) → Gümüş (14) → Altın (30) → Mithril (40) → Göktaşı (60)</b>. Her alışkanlığın kendi zinciri vardır.</li>
    <li>Gecikme paslı halka ekler, üst üste ikincisi zinciri kırar. Kaçırılan gün zinciri kırar, bir malzeme düşersin.</li>
    <li><b>Kefaret:</b> kırıldıktan sonraki ${REPAIR_NEED} günü başarırsan eski uzunluk geri gelir. <b>Dinlenme günü:</b> haftada bir, önceden ilan edilir.</li>
   </ul>
-  <h3>Okul ve yeniden doğuş</h3>
-  <p>Her karakter bir fraksiyona odaklanır: sadece o fraksiyonun ve tarafsız kartlar düşer. İstediğin zaman (genelde son boss'tan sonra) yeniden doğabilirsin: karakter Okul'a kalıcı olarak eklenir, yenisi sıfırdan başlar. Ana görev, zincir ve kayıtlar karakterden bağımsızdır.</p>
+  <h3>Okullar, karakterler ve yeniden doğuş</h3>
+  <p>Her karakter bir fraksiyona odaklanır: sadece o fraksiyonun ve tarafsız kartlar düşer. İstediğin zaman (genelde son boss'tan sonra) yeniden doğabilirsin: karakter Karakterlerim'e kalıcı olarak eklenir, yenisi sıfırdan başlar. Her okulun oynanışı ve hikâyesi Okullar sekmesinde. Alışkanlıklar, zincirler ve kayıtlar karakterden bağımsızdır.</p>
   <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">Anladım</button></div>`);
 }
 function showRulesEn() {
   openModal(`<h2>How to play</h2>
-  <h3>Main quest</h3>
-  <p>One habit you want to build. A <b>sleep schedule</b> has a bedtime window and a wake-up window; a <b>daily habit</b> has a single window. When inside the window you do it doesn't matter. You pick a goal of ${QUEST_MIN}–${QUEST_MAX} days; collect that many successful days and the habit is formed.</p>
+  <h3>Habits (main quests)</h3>
+  <p>You track up to ${MAX_HABITS} habits you want to build at the same time; each one is its own main quest with its own chain. For each you pick a goal of ${QUEST_MIN}–${QUEST_MAX} days; collect that many successful days and the habit is formed (a Legendary card, crowns and XP). Then you can continue on the <b>path of mastery</b> with the same chain (rewards ×${MASTERY_MULT}), or drop it and add a new one.</p>
+  <p>There are four kinds of habit:</p>
+  <ul>
+   <li><b>Time window:</b> do it within the window you set (e.g. a workout 07:00–08:00). Doing it before the window counts too.</li>
+   <li><b>Done / not done:</b> do it any time during the day; the day lasts until ${DAY_END_UI} at night. You can add sub-tasks; ticking them all completes the day.</li>
+   <li><b>Count:</b> has a daily target number (e.g. 8 glasses of water); reaching it makes the day a success. Reaching half of it by the end of the day counts as late. Also works with sub-tasks: "do this many of them".</li>
+   <li><b>Sleep schedule:</b> has a bedtime window and a wake-up window. Meditating in the bedtime window makes the morning's reward ×1.5 and gives +1 card; the day itself is decided by the wake-up.</li>
+  </ul>
   <h3>Every day</h3>
-  <p><b>Bedtime (sleep):</b> meditating in the window gives a small reward and makes the morning ×1.5 with +1 card. <b>Wake-up / quest:</b> doing it in the window is a success: cards, XP, crowns and a new chain link. Doing it after the window, within the tolerance, is late; not doing it at all is missed.</p>
+  <p>Every habit counts separately each day. Doing it on time is a <b>success</b>: cards, XP, crowns and a new link on its chain (the day's first success gives 2 cards, later ones 1). Doing it after the window, within the tolerance, is <b>late</b>; not doing it at all is <b>missed</b>. Once a week you can declare a <b>rest day</b>: do it that day for rewards, skip it with no penalty. Side quests are small one-off tasks that give a little XP and crowns.</p>
   <h3>Contracts and regions</h3>
-  <p>Every Monday each unlocked region's notice board gets ${BOARD_SIZE} monsters. Pick one from any region on the map, and your successful days damage it. Each monster has its own HP and reward: weaker monsters pay less. When it dies you get crowns, XP and cards. A monster doesn't return for the same character (after you become a legend, it returns as an elite). Most XP comes from monsters.</p>
+  <p>Every Monday each unlocked region's notice board gets ${BOARD_SIZE} monsters. Pick one from any region on the map; your character fights it every hour (see The hunt below). Each monster has its own HP and reward: weaker monsters pay less. When it dies you get crowns, XP and scraps, and sometimes the monster's own card. A monster doesn't return for the same character (after you become a legend, it returns as an elite). Most XP comes from monsters.</p>
   <p>Tiers: ${Array.from({ length: BAND_COUNT }, (_, b) => `${bandLabel(b)} (${b * 4 + 1}–${b * 4 + 4})`).join(' → ')}. Regions of the same tier unlock together. At a tier's top level your XP keeps building (up to one level), but to advance you must defeat one of the tier's bosses; the other can still be fought later. The character who beats the final boss becomes a legend and can keep playing: monsters and bosses return as elites, and XP past level 32 grants Renown (★).</p>
   <h3>Damage</h3>
   <p>You strike once an hour: (level power + silver sword) × (1 + bonus). A silver sword adds damage, a steel sword a crit chance (×1.5); their power depends on the sword's level and rarity. Chains are your main power source: Steel +10%, Silver +20%, Gold +30%, Mithril +50%, Meteorite +100%. ${MULTI_CHAIN_TXT()} Chain, card link and bane bonuses simply add up; there is no cap. Swords come at your level; raise their level with crowns and scraps up to your own.</p>
   <h3>The hunt (idle)</h3>
-  <p>Your character fights the contract's monster continuously, even while the app is closed. Your damage per hour comes from your level, swords, chains and card links. Monsters don't hit you on their own: being late on a quest earns you half a hit, missing it a full hit (bosses hit harder). HP regenerates about 0.3% per hour while hunting (by school: Bear 0.5%, Griffin 0.35%, Wolf 0.3%, Viper 0.25%, Cat 0.2%, Manticore 0.3%); while recovering from a defeat, 15% per hour (Bear School 30%). The contract never ends: pick another one from a board if you like (the old one's progress resets), otherwise the easiest job is taken automatically. In an emergency, drink a Swallow; Thunderbolt raises damage by 20% for 12 hours, Tawny Owl gives +10 XP on purchase, and the Dancing Star bomb hits the monster for a random 3–10 hours of your damage at the cost of 50% of your HP. Below 50% HP you are Wounded: −20% damage. If your HP hits zero you are defeated: the monster heals completely, you lose 10% of your crowns and recover until your HP is full. Cards come from habits, not from the hunt.</p>
+  <p>Your character fights the contract's monster continuously, even while the app is closed. Your damage per hour comes from your level, swords, chains and card links. Monsters don't hit you on their own: being late on a quest earns you half a hit, missing it a full hit (bosses hit harder). HP regenerates about 0.3% per hour while hunting (by school: Bear 0.5%, Griffin 0.35%, Wolf 0.3%, Viper 0.25%, Cat 0.2%, Manticore 0.3%); while recovering from a defeat, 15% per hour (Bear School 30%). The contract never ends: pick another one from a board if you like (the old one's progress resets), otherwise the easiest job is taken automatically. In an emergency, drink a Swallow: it heals 50% of your max HP. Thunderbolt raises damage by 20% for 24 hours (Enhanced +30% from level 13, Superior +40% from level 25; they don't stack). Petri’s Philter gives XP on purchase (+10 / +20 / +35; at most one a day). The Dancing Star bomb hits the monster for a random 3–10 hours of your damage; after a throw you must wait 48 hours for the next. Below 50% HP you are Wounded: −20% damage. If your HP hits zero you are defeated: the monster heals completely, you lose 10% of your crowns and recover until your HP is full. Cards come from habits, not from the hunt.</p>
   <h3>Penalties</h3>
-  <p>Being late means half a monster hit and 12 hours "Tired" (−15% damage); missing means a full hit and 24 hours "Exhausted" (−30%); penalties stack up to −60%. White Honey is drunk automatically on a missed day: the monster can't strike and you don't become Exhausted. The Griffin School never becomes Tired or Exhausted.</p>
+  <p>Being late means half a monster hit and 12 hours "Tired" (−15% damage); missing means a full hit and 24 hours "Exhausted" (−30%); penalties stack up to −60%. Mahakam Ale is drunk automatically on a missed day: you don't become Exhausted. The Griffin School never becomes Tired or Exhausted.</p>
   <h3>Chain</h3>
   <ul>
-   <li>Each successful day adds a link: <b>Iron → Steel (7) → Silver (14) → Gold (30) → Meteorite (60)</b>.</li>
+   <li>Each successful day adds a link: <b>Iron → Steel (7) → Silver (14) → Gold (30) → Mithril (40) → Meteorite (60)</b>. Every habit has its own chain.</li>
    <li>Being late adds a rusty link; a second one in a row breaks the chain. A missed day breaks the chain and you drop one material.</li>
    <li><b>Atonement:</b> succeed the ${REPAIR_NEED} days after a break and your old length comes back. <b>Rest day:</b> once a week, declared in advance.</li>
   </ul>
-  <h3>School and rebirth</h3>
-  <p>Each character focuses on a faction: only that faction's cards and Neutral cards drop (or pick all factions). You can be reborn anytime (usually after the final boss): the character joins the School for good and a new one starts from scratch. The main quest, chain and records don't belong to the character.</p>
+  <h3>Schools, characters and rebirth</h3>
+  <p>Each character focuses on a faction: only that faction's cards and Neutral cards drop (or pick all factions). You can be reborn anytime (usually after the final boss): the character moves to My Characters for good and a new one starts from scratch. Each school's gameplay and lore are on the Schools tab. Habits, chains and records don't belong to the character.</p>
   <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">Got it</button></div>`);
 }
 function showFileMode() {
@@ -1309,7 +1676,7 @@ document.addEventListener('click', async e => {
     case 'addcountin': { const v = +$('#cnt-' + t.dataset.h)?.value; if (!v) return toast(L('Bir sayı gir.', 'Enter a number.'), 'bad'); act(E.addCount(v, t.dataset.h)); break; }
     case 'tab': switchTab(t.dataset.tab); break;
     case 'drink': act(E.drinkPotion()); break;
-    case 'thunder': act(E.drinkThunder()); break;
+    case 'thunder': act(E.drinkThunder(id || 'thunder')); break;
     case 'dancing': act(E.throwDancing()); break;
     case 'queue': if (act(E.queueAdd(id)) && $('#modalBox .cboard')) showBoard(boardSel.r); break;
     case 'unqueue': act(E.queueRemove(id)); break;
@@ -1371,10 +1738,34 @@ document.addEventListener('click', async e => {
     case 'delside': if (confirm(L('Bu yan görev silinsin mi?', 'Delete this side quest?'))) act(E.removeSide(id)); break;
     case 'addside': act(E.addSide($('#qName').value, $('#qXp').value, $('#qGold').value)); break;
     case 'card': if (!t.closest('.flip')) showCardDetail(+t.dataset.a); break;
+    case 'cardinfo': try { localStorage.setItem('hofw-cardinfo', cardInfoOn() ? '0' : '1'); } catch { /* yoksa */ } showCardDetail(+t.dataset.a); break;
     case 'page': colFilter.page += +t.dataset.v; renderCollection(); break;
     case 'avatar': st().avatar = +t.dataset.a; closeModal(); commit(); toast(L('Madalyon güncellendi.', 'Medallion updated.')); break;
     case 'craft': closeModal(); act(E.craft(+t.dataset.a)); break;
     case 'buy': act(E.buy(id)); break;
+    case 'item': showItemDetail(id, t.dataset.mode); break;
+    case 'catalog': catalog.lv = null; showCatalog(); break;
+    case 'catset': catalog[t.dataset.k] = t.dataset.v; showCatalog(); $('#modalBox').scrollTop = 0; break;
+    case 'itembuy': closeModal(); if (act(E.buy(id)) && !modalOpen()) { if (id === 'puzzle') showPuzzle(); else if (id === 'mutagen') showOddity(E.ev.oddity, true); else showItemDetail(id, 'shop'); } break;
+    case 'oddity': showOddity(id); break;
+    case 'miniimg': miniSel.img = String(miniSel.img) === t.dataset.a ? null : +t.dataset.a; renderMini(); break;
+    case 'minislot': { const i = +t.dataset.i;
+      if (miniSel.img != null) { miniSel.slots[i] = miniSel.img; miniSel.img = null; } else if (miniSel.slots[i] != null) miniSel.slots[i] = null;
+      renderMini(); break; }
+    case 'minipick': miniSel.pick = +t.dataset.a; renderMini(); break;
+    case 'minikind': { const r = E.dev.miniKind(t.dataset.k || null); if (r.err) toast(r.err, 'bad'); miniSel = { date: null }; renderMini(); break; }
+    case 'minireset': E.dev.miniReset(); miniSel = { date: null }; save(); renderMini(); break;
+    case 'minimode': miniMode = t.dataset.k; renderMini(); break;
+    case 'practice': { const r = E.startPractice(t.dataset.k); if (r.err) toast(r.err, 'bad'); renderMini(); break; }
+    case 'miniplay': if (miniMode === 'practice') { const r = E.playPractice(miniAnswer()); if (r.err) toast(r.err, 'bad'); else toast(r.won ? L('Doğru!', 'Correct!') : L('Bu sefer olmadı.', 'Not this time.'), r.won ? 'good' : 'bad'); renderMini(); break; }
+    { const r = E.playMini(miniAnswer()); if (act(r)) toast(r.won ? L(`Kazandın! +${r.got} oren`, `You won! +${r.got} crowns`) : L('Bu sefer olmadı.', 'Not this time.'), r.won ? 'good' : 'bad'); break; }
+    case 'oddtoggle': st().settings ||= {}; st().settings.showOdd = !oddShown(); save(); render(); break;
+    case 'puzzleopen': showPuzzle(); break;
+    case 'puzzleanswer': answerPuzzle(); break;
+    case 'puzzledone': closeModal(); render(); showQueue(); break;
+    case 'itemuse': { const inModal = !!t.closest('#modalBox'); const r = id === 'swallow' ? E.drinkPotion() : id === 'dancing' ? E.throwDancing() : id === 'blackblood' ? E.drinkBlackBlood() : E.drinkThunder(id);
+      if (!inModal) { act(r); break; }
+      closeModal(); if (act(r) && !modalOpen() && (st()[id] || 0) > 0) showItemDetail(id, 'own'); break; }
     case 'buysword': { const w = swordById(id), p = w && E.shopPrice(w); if (w && confirm(L(`${w.name} (seviye ${st().level}) için ${p} oren harcansın mı?`, `Spend ${p} crowns on ${w.name} (level ${st().level})?`))) act(E.buySword(id)); break; }
     case 'equip': act(E.equipSword(id)); break;
     case 'equipbest': act(E.equipBest()); break;
@@ -1400,7 +1791,7 @@ document.addEventListener('click', async e => {
     case 'rebirth': showRebirth(); break;
     case 'rebirthgo': {
       const newName = $('#rbName')?.value.trim() || undefined;
-      if (!confirm(L(`${st().name} Okul'a eklenecek ve yeni karakter sıfırdan başlayacak. Emin misin?`, `${st().name} will join the School and a new character will start from scratch. Are you sure?`))) return;
+      if (!confirm(L(`${st().name} Karakterlerim'e eklenecek ve yeni karakter sıfırdan başlayacak. Emin misin?`, `${st().name} will move to My Characters and a new character will start from scratch. Are you sure?`))) return;
       closeModal();
       if (act(E.rebirth({ name: newName, school: pickSchool, faction: pickFaction }))) { switchTab('home'); toast(L('Yeni bir yol başladı.', 'A new path begins.'), 'good'); }
       break;
@@ -1423,6 +1814,9 @@ document.addEventListener('click', async e => {
       openModal(`<h2>${L('Okul değiştir', 'Change school')} (150 🪙)</h2>${schoolGrid()}<div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="close">${L('Vazgeç', 'Cancel')}</button><button class="btn" data-act="confirmschool">${L('Değiştir', 'Change')}</button></div>`);
       break;
     case 'changefaction': { const f = $('#newFaction')?.value; if (f && confirm(L('Kart odağı değişsin mi?', 'Change card focus?'))) act(E.changeFaction(f)); break; }
+    case 'switchschool':
+      if (confirm(L(`${SCHOOLS[id].name} okuluna geçilsin mi? 150 oren.`, `Switch to the ${SCHOOLS[id].name}? 150 crowns.`))) act(E.changeSchool(id));
+      break;
     case 'confirmschool': closeModal(); if (pickSchool !== st().school) act(E.changeSchool(pickSchool)); break;
     case 'pickschool': pickSchool = id; t.parentElement.querySelectorAll('.school').forEach(el => el.classList.toggle('sel', el.dataset.id === id)); break;
     case 'pickfaction': pickFaction = id; t.parentElement.querySelectorAll('.school').forEach(el => el.classList.toggle('sel', el.dataset.id === id)); break;
@@ -1480,6 +1874,7 @@ document.addEventListener('change', e => {
   const f = e.target.dataset?.f;
   if (f) { colFilter[f] = e.target.value; colFilter.page = 0; renderCollection(); }
   if (e.target.id === 'linkFac') { linkFaction = e.target.value; renderLinks(); }
+  if (e.target.dataset?.minicls != null) miniSel.cls[+e.target.dataset.minicls] = e.target.value;
   if (e.target.dataset?.q === 'type') {
     const form = e.target.closest('.qform'); form.dataset.qtype = e.target.value;
     form.querySelectorAll('.qsec').forEach(sec => { sec.hidden = !sec.dataset.t.split(' ').includes(e.target.value); });
@@ -1544,8 +1939,8 @@ function tick(force = false) {
 }
 /* index.html'deki sabit metinler */
 const STATIC_TABS = { home: ['Kontrat', 'Contract'], mainquest: ['Alışkanlıklar', 'Habits'], quests: ['Yan Görevler', 'Side Quests'], collection: ['Koleksiyon', 'Collection'],
-  links: ['Kart Bağları', 'Card Links'], bestiary: ['Bestiary', 'Bestiary'], shop: ['Tüccar', 'Merchant'], achievements: ['Başarımlar', 'Achievements'],
-  hall: ['Okul', 'School'], history: ['Kayıtlar', 'Records'], settings: ['Ayarlar', 'Settings'] };
+  links: ['Kart Bağları', 'Card Links'], bestiary: ['Bestiary', 'Bestiary'], shop: ['Tüccar', 'Merchant'], items: ['Eşyalarım', 'My Items'], mini: ['Günlük Oyun', 'Daily Game'], achievements: ['Başarımlar', 'Achievements'],
+  hall: ['Karakterlerim', 'My Characters'], schools: ['Okullar', 'Schools'], history: ['Kayıtlar', 'Records'], settings: ['Ayarlar', 'Settings'] };
 function applyStatic() {
   document.querySelectorAll('#tabs button').forEach(b => { const x = STATIC_TABS[b.dataset.tab]; if (x) b.textContent = L(...x); });
   const stat = (sel, label, title) => { const el = $(sel)?.closest('.stat'); if (!el) return; el.querySelector('small').textContent = L(...label); if (title) el.title = L(...title); };

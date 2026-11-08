@@ -6,7 +6,7 @@ Keep your habits and your witcher grows stronger, earns crowns and collects Gwen
 
 *Türkçe açıklama aşağıda.*
 
-> **Unofficial fan project.** Not affiliated with or endorsed by CD PROJEKT RED. Non-commercial; no money is made from it in any way. The Witcher, Gwent and all related names, card art and texts are the property of CD PROJEKT S.A. No card data or images are included in this repository; card data is downloaded from gwent.one during setup.
+> **Unofficial fan project.** Not affiliated with or endorsed by CD PROJEKT RED. Non-commercial; no money is made from it in any way. The Witcher, Gwent and all related names, card art and texts are the property of CD PROJEKT S.A. The card texts (`cards.js`, `cards-info.json`) are included so the game keeps working even if gwent.one goes away; card images are not included and are loaded from gwent.one.
 
 ## How it works
 
@@ -48,11 +48,11 @@ Keep your habits and your witcher grows stronger, earns crowns and collects Gwen
 ### Potions and bombs
 | Item | Effect | Price |
 |---|---|---|
-| Swallow | +50 HP | 100 |
-| White Honey | Drunk automatically on a missed day: the monster can't strike and you don't become Exhausted | 60 |
-| Thunderbolt | +20% damage for 12 hours | 120 |
-| Tawny Owl | +10 XP, drunk on purchase | 50 |
-| Dancing Star (bomb) | Hits the monster for 3–10 hours' worth of your damage, but costs 50% of your HP | 60 |
+| Swallow | Heals 50% of your max HP | 100 |
+| Mahakam Ale | Drunk automatically on a missed day: you don't become Exhausted | 60 |
+| Thunderbolt | +20% damage for 24 hours (Enhanced +30% from level 13: 300 · Superior +40% from level 25: 600). Doesn't stack | 120 |
+| Petri’s Philter | +10 XP, drunk on purchase (Enhanced +20 XP: 150 · Superior +35 XP: 350). One a day | 50 |
+| Dancing Star (bomb) | Hits the monster for 3–10 hours' worth of your damage; 48-hour cooldown between throws | 120 |
 
 ### Witcher schools
 Each school changes how you play:
@@ -66,7 +66,7 @@ Each school changes how you play:
 | **Viper** | Punctual: do a habit early for ×1.4 rewards and +10% damage for 24 hours |
 | **Manticore** | Alchemist: potions cost half, and Dancing Star hits 30% harder |
 
-Each school also has 3 favourite card categories. Card links in those categories are worth ×1.5.
+Each school also has 3 favourite card categories. Card links in those categories are worth ×1.5. The Schools tab in the app explains each school's mechanics and lore.
 
 ### Swords
 - Every day the blacksmith sells 5 silver and 5 steel swords, all at **your level**.
@@ -92,8 +92,8 @@ Each school also has 3 favourite card categories. Card links in those categories
 - **Card links:** 5 cards from the same faction and category form a link that adds permanent damage. You can have up to 10 links.
 - Duplicate cards turn into scraps. Scraps craft missing cards and upgrade swords.
 
-### The School hall
-After the final boss you can be **reborn** as a new character. The old one joins the School hall and gives every future character a bonus:
+### My Characters
+After the final boss you can be **reborn** as a new character. The old one moves to the My Characters tab and gives every future character a bonus:
 - +3% crowns for each legend (up to 15%)
 - +1% XP for each character (up to 10%)
 
@@ -111,7 +111,7 @@ You only need **Python 3.9+**. No extra packages.
 1. Download the repository.
 2. **Windows:** double-click `Baslat.bat`.
    **macOS / Linux:** run `python3 server.py`.
-3. On the first start, card data is downloaded from gwent.one into `cards.js`. If that fails, run it by hand:
+3. Card texts (`cards.js`, `cards-info.json`) come with the repository. To refresh them from gwent.one, run:
    ```
    python3 tools/fetch_cards.py
    ```
@@ -133,14 +133,14 @@ You only need **Python 3.9+**. No extra packages.
 | `engine.js` | Game rules (no DOM, pure logic) |
 | `app.js`, `index.html`, `style.css` | User interface |
 | `monsters.js`, `swords.js` | Regions, monsters and swords (balance values) |
-| `tools/fetch_cards.py` | Downloads card data and builds `cards.js` |
+| `tools/fetch_cards.py` | Downloads card data from gwent.one and rebuilds `cards.js` and `cards-info.json` |
 | `tools/build_swords.py` | Builds `swords.js` |
 | `imgcache.py`, `tools/cache_images.py` | Image cache (`hofw-gorsel.db`) and bulk download |
 | `tests.js`, `tests.html` | In-browser tests and balance simulation |
 
 ## Credits
 
-- Card data and art: [gwent.one](https://gwent.one) (loaded at runtime, not redistributed).
+- Card data and art: [gwent.one](https://gwent.one). Card texts are included in the repository; card art is loaded at runtime and not redistributed.
 - Sword images: [The Witcher Wiki](https://witcher.fandom.com) and [witcherdb.com](https://witcherdb.com) (loaded at runtime).
 - Manticore School artwork: provided by the project author.
 - The Witcher and Gwent © CD PROJEKT S.A.
@@ -157,7 +157,7 @@ Günlük alışkanlıklarını bir canavar avına çeviren, Witcher temalı bir 
 
 Alışkanlıklarını sürdürürsen witcher'ın güçlenir, oren kazanır ve Gwent kartları toplar. Aksatırsan peşinde olduğun canavar sana vurur.
 
-> **Resmi olmayan hayran projesi.** CD PROJEKT RED ile bağlantısı yoktur, ticari değildir ve hiçbir şekilde para kazanılmaz. The Witcher, Gwent ve ilgili isimler, kart görselleri ve metinler CD PROJEKT S.A.'ya aittir. Bu depoda kart verisi ya da görsel bulunmaz; kart verisi kurulumda gwent.one'dan indirilir.
+> **Resmi olmayan hayran projesi.** CD PROJEKT RED ile bağlantısı yoktur, ticari değildir ve hiçbir şekilde para kazanılmaz. The Witcher, Gwent ve ilgili isimler, kart görselleri ve metinler CD PROJEKT S.A.'ya aittir. gwent.one kapansa bile oyun çalışsın diye kart metinleri (`cards.js`, `cards-info.json`) depoda bulunur; kart görselleri depoda yoktur, gwent.one'dan yüklenir.
 
 ## Nasıl çalışır
 
@@ -199,11 +199,11 @@ Alışkanlıklarını sürdürürsen witcher'ın güçlenir, oren kazanır ve Gw
 ### İksirler ve bombalar
 | Eşya | Etkisi | Fiyat |
 |---|---|---|
-| Swallow | +50 can | 100 |
-| White Honey | Kaçırılan bir günde kendiliğinden içilir: canavar vuramaz, Bitkin olmazsın | 60 |
-| Thunderbolt | 12 saat hasar +%20 | 120 |
-| Tawny Owl | Alınınca hemen içilir: +10 TP | 50 |
-| Dancing Star (bomba) | Canavara 3–10 saatlik hasarın kadar vurur, ama canının %50'sini alır | 60 |
+| Swallow | En yüksek canın %50'si | 100 |
+| Mahakam Ale | Kaçırılan bir günde kendiliğinden içilir: Bitkin olmazsın | 60 |
+| Thunderbolt | 24 saat hasar +%20 (Gelişmiş +%30, 13. seviyeden: 300 · Üstün +%40, 25. seviyeden: 600). Üst üste binmez | 120 |
+| Petri’s Philter | Alınınca hemen içilir: +10 TP (Gelişmiş +20 TP: 150 · Üstün +35 TP: 350). Günde bir tane | 50 |
+| Dancing Star (bomba) | Canavara 3–10 saatlik hasarın kadar vurur; iki atış arasında 48 saat bekleme | 120 |
 
 ### Witcher okulları
 Her okul oyun tarzını değiştirir:
@@ -217,7 +217,7 @@ Her okul oyun tarzını değiştirir:
 | **Viper** | Dakik: alışkanlığı erken yaparsan ödül ×1,4 ve 24 saat hasar +%10 |
 | **Manticore** | Simyacı: iksirler yarı fiyatına, Dancing Star %30 daha sert vurur |
 
-Her okulun 3 sevdiği kart türü de vardır. Bu türlerdeki kart bağları ×1,5 değerlidir.
+Her okulun 3 sevdiği kart türü de vardır. Bu türlerdeki kart bağları ×1,5 değerlidir. Uygulamadaki Okullar sekmesi her okulun oynanışını ve hikâyesini anlatır.
 
 ### Kılıçlar
 - Demirci her gün 5 gümüş ve 5 çelik kılıç satar, hepsi **senin seviyende**.
@@ -243,8 +243,8 @@ Her okulun 3 sevdiği kart türü de vardır. Bu türlerdeki kart bağları ×1,
 - **Kart bağları:** aynı fraksiyon ve türden 5 kart, kalıcı hasar ekleyen bir bağ kurar. En fazla 10 bağın olabilir.
 - Tekrar gelen kartlar kırıntıya dönüşür. Kırıntıyla eksik kartları üretir, kılıç yükseltirsin.
 
-### Okul salonu
-Son boss'tan sonra yeni bir karakter olarak **yeniden doğabilirsin**. Eski karakter Okul salonuna katılır ve sonraki bütün karakterlere bonus verir:
+### Karakterlerim
+Son boss'tan sonra yeni bir karakter olarak **yeniden doğabilirsin**. Eski karakter Karakterlerim sekmesine taşınır ve sonraki bütün karakterlere bonus verir:
 - Her efsane için +%3 oren (en çok %15)
 - Her karakter için +%1 TP (en çok %10)
 
@@ -262,7 +262,7 @@ Gereken tek şey **Python 3.9+**. Ek paket yok.
 1. Depoyu indir.
 2. **Windows:** `Baslat.bat` dosyasına çift tıkla.
    **macOS / Linux:** `python3 server.py` çalıştır.
-3. İlk açılışta kart verisi gwent.one'dan `cards.js` dosyasına indirilir. İndirme başarısız olursa elle çalıştır:
+3. Kart metinleri (`cards.js`, `cards-info.json`) depoyla birlikte gelir. gwent.one'dan güncellemek istersen çalıştır:
    ```
    py -3 tools/fetch_cards.py        (macOS/Linux: python3 tools/fetch_cards.py)
    ```

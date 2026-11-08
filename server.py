@@ -360,6 +360,24 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
+    def _forbidden(self):
+        """Veritabanı, kod, yedek ve ayar dosyaları (PIN özeti ve oturum anahtarı içerir) asla sunulmaz.
+        Kontrol diskteki gerçek yol üzerinden yapılır: %2E gibi kodlamalar ve Windows'un yok saydığı sondaki nokta/boşluk atlatamaz."""
+        fs = os.path.abspath(self.translate_path(self.path))
+        rel = os.path.relpath(fs, ROOT)                     # sadece uygulama klasörünün içindeki parçalar (kurulum yolu önemsiz)
+        parts = [x.rstrip(". ").lower() for x in rel.split(os.sep)]
+        name = parts[-1] if parts else ""
+        if any(p in ("backups", "__pycache__", "tools", ".git", ".claude") for p in parts):
+            return True
+        return name.endswith((".db", ".py", ".pyc", ".bat", "-ayar.json", ".db-wal", ".db-shm", ".db-journal")) or "::$" in name
+
+    def do_HEAD(self):
+        if self._forbidden():
+            self.send_response(404)
+            self.end_headers()
+            return
+        return super().do_HEAD()
+
     def do_GET(self):
         path = urlparse(self.path).path
         if path == "/api/access":
@@ -379,7 +397,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_response(204)
             self.end_headers()
             return
-        if path.endswith((".db", ".py", ".bat")) or "/backups" in path:
+        if self._forbidden():
             return self._json(404, {"error": "not found"})
         return super().do_GET()
 
@@ -468,7 +486,7 @@ def port_in_use(port):
 
 def ensure_cards():
     """Kart verisi (cards.js) depoda dağıtılmaz; yoksa ilk açılışta gwent.one'dan indirilir."""
-    if os.path.exists(os.path.join(ROOT, "cards.js")):
+    if os.path.exists(os.path.join(ROOT, "cards.js")) and os.path.exists(os.path.join(ROOT, "cards-info.json")):
         return
     print("Kart verisi bulunamadı, gwent.one'dan indiriliyor (bir kez)...")
     try:
