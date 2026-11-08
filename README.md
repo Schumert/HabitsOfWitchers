@@ -6,11 +6,14 @@ Keep your habits and your witcher grows stronger, earns crowns and collects Gwen
 
 *Türkçe açıklama aşağıda.*
 
-> **Unofficial fan project.** Not affiliated with or endorsed by CD PROJEKT RED. Non-commercial; no money is made from it in any way. The Witcher, Gwent and all related names, card art and texts are the property of CD PROJEKT S.A. The card texts (`cards.js`, `cards-info.json`) are included so the game keeps working even if gwent.one goes away; card images are not included and are loaded from gwent.one.
+> **Unofficial fan project.** Not affiliated with or endorsed by CD PROJEKT RED. Non-commercial; no money is made from it in any way. The Witcher, Gwent and all related names, card art and texts are the property of CD PROJEKT S.A.
 
 ## How it works
 
 ### Habits
+
+![Habits tab](docs/screenshots/habits.jpg)
+
 - You can track up to **5 habits** at once. Each one is a quest lasting 14–60 days.
 - There are four kinds of habit:
   - **Sleep:** a bedtime window and a wake-up window.
@@ -35,6 +38,9 @@ Keep your habits and your witcher grows stronger, earns crowns and collects Gwen
 - A broken chain drops one tier. Succeed on the next 2 days (**atonement**) and the lost links come back.
 
 ### The hunt
+
+![Contract tab: today's quests and the hunt](docs/screenshots/contract.jpg)
+
 - You always have a contract on a monster, and your witcher fights it **every hour**, even while the app is closed.
 - **Hourly damage** = (your level's power + silver sword) × (chains + card links + sword bonuses). A steel sword adds a chance of a critical hit (×1.5).
 - Monsters never attack on their own. They hit you **only when you are late (half a hit) or miss a habit (a full hit)**.
@@ -46,6 +52,9 @@ Keep your habits and your witcher grows stronger, earns crowns and collects Gwen
 - **After the final boss** your character becomes a legend. Slain monsters return as stronger elites, and XP past level 32 earns Renown (★).
 
 ### Potions and bombs
+
+![Merchant](docs/screenshots/merchant.jpg)
+
 | Item | Effect | Price |
 |---|---|---|
 | Swallow | Heals 50% of your max HP | 100 |
@@ -55,6 +64,9 @@ Keep your habits and your witcher grows stronger, earns crowns and collects Gwen
 | Dancing Star (bomb) | Hits the monster for 3–10 hours' worth of your damage; 48-hour cooldown between throws | 120 |
 
 ### Witcher schools
+
+![Schools tab](docs/screenshots/schools.jpg)
+
 Each school changes how you play:
 
 | School | Strength |
@@ -69,6 +81,9 @@ Each school changes how you play:
 Each school also has 3 favourite card categories. Card links in those categories are worth ×1.5. The Schools tab in the app explains each school's mechanics and lore.
 
 ### Swords
+
+![Blacksmith](docs/screenshots/blacksmith.jpg)
+
 - Every day the blacksmith sells 5 silver and 5 steel swords, all at **your level**.
   - Silver swords add damage; steel swords add critical-hit chance.
   - Higher levels bring rarer swords more often.
@@ -87,17 +102,26 @@ Each school also has 3 favourite card categories. Card links in those categories
 - **School sets:** from tier 2 on, bosses drop diagrams for witcher school gear, which the blacksmith can craft.
 
 ### Gwent cards
+
+![Card collection](docs/screenshots/collection.jpg)
+
 - You earn cards from habits, kills, chain milestones and kegs bought from the merchant.
 - Focus on one faction to complete its collection faster, or collect from all of them.
 - **Card links:** 5 cards from the same faction and category form a link that adds permanent damage. You can have up to 10 links.
 - Duplicate cards turn into scraps. Scraps craft missing cards and upgrade swords.
 
 ### My Characters
+
+![My Characters tab](docs/screenshots/characters.jpg)
+
 After the final boss you can be **reborn** as a new character. The old one moves to the My Characters tab and gives every future character a bonus:
 - +3% crowns for each legend (up to 15%)
 - +1% XP for each character (up to 10%)
 
 ### Also
+
+![Records and sleep charts](docs/screenshots/records.jpg)
+
 - Achievements and a weekly summary, plus sleep charts.
 - Sound effects.
 - **Phone access:** open the app from a phone on the same Wi-Fi, with an optional PIN.
@@ -157,11 +181,14 @@ Günlük alışkanlıklarını bir canavar avına çeviren, Witcher temalı bir 
 
 Alışkanlıklarını sürdürürsen witcher'ın güçlenir, oren kazanır ve Gwent kartları toplar. Aksatırsan peşinde olduğun canavar sana vurur.
 
-> **Resmi olmayan hayran projesi.** CD PROJEKT RED ile bağlantısı yoktur, ticari değildir ve hiçbir şekilde para kazanılmaz. The Witcher, Gwent ve ilgili isimler, kart görselleri ve metinler CD PROJEKT S.A.'ya aittir. gwent.one kapansa bile oyun çalışsın diye kart metinleri (`cards.js`, `cards-info.json`) depoda bulunur; kart görselleri depoda yoktur, gwent.one'dan yüklenir.
+> **Resmi olmayan hayran projesi.** CD PROJEKT RED ile bağlantısı yoktur, ticari değildir ve hiçbir şekilde para kazanılmaz. The Witcher, Gwent ve ilgili isimler, kart görselleri ve metinler CD PROJEKT S.A.'ya aittir.
 
 ## Nasıl çalışır
 
 ### Alışkanlıklar
+
+![Alışkanlıklar sekmesi](docs/screenshots/habits.jpg)
+
 - Aynı anda en fazla **5 alışkanlık** takip edebilirsin. Her biri 14–60 gün süren bir görevdir.
 - Dört tür alışkanlık var:
   - **Uyku:** bir yatış aralığı ve bir kalkış aralığı.
@@ -186,6 +213,9 @@ Alışkanlıklarını sürdürürsen witcher'ın güçlenir, oren kazanır ve Gw
 - Kırılan zincir bir kademe düşer. Sonraki 2 günü başarırsan (**kefaret**) kaybolan halkalar geri gelir.
 
 ### Av
+
+![Kontrat sekmesi: günün görevleri ve av](docs/screenshots/contract.jpg)
+
 - Her zaman bir canavarla kontratın vardır ve witcher'ın onunla **her saat** savaşır, uygulama kapalıyken bile.
 - **Saatlik hasar** = (seviyenin gücü + gümüş kılıç) × (zincirler + kart bağları + kılıç bonusları). Çelik kılıç kritik vuruş şansı ekler (×1,5).
 - Canavarlar kendiliğinden saldırmaz. Sana **sadece geç kaldığında (yarım vuruş) ya da bir alışkanlığı kaçırdığında (tam vuruş)** vururlar.
@@ -197,6 +227,9 @@ Alışkanlıklarını sürdürürsen witcher'ın güçlenir, oren kazanır ve Gw
 - **Son boss'tan sonra** karakterin efsane olur. Kestiğin canavarlar daha güçlü elitler olarak geri döner, 32. seviyeden sonraki TP Ün (★) kazandırır.
 
 ### İksirler ve bombalar
+
+![Tüccar](docs/screenshots/merchant.jpg)
+
 | Eşya | Etkisi | Fiyat |
 |---|---|---|
 | Swallow | En yüksek canın %50'si | 100 |
@@ -206,6 +239,9 @@ Alışkanlıklarını sürdürürsen witcher'ın güçlenir, oren kazanır ve Gw
 | Dancing Star (bomba) | Canavara 3–10 saatlik hasarın kadar vurur; iki atış arasında 48 saat bekleme | 120 |
 
 ### Witcher okulları
+
+![Okullar sekmesi](docs/screenshots/schools.jpg)
+
 Her okul oyun tarzını değiştirir:
 
 | Okul | Gücü |
@@ -220,6 +256,9 @@ Her okul oyun tarzını değiştirir:
 Her okulun 3 sevdiği kart türü de vardır. Bu türlerdeki kart bağları ×1,5 değerlidir. Uygulamadaki Okullar sekmesi her okulun oynanışını ve hikâyesini anlatır.
 
 ### Kılıçlar
+
+![Demirci](docs/screenshots/blacksmith.jpg)
+
 - Demirci her gün 5 gümüş ve 5 çelik kılıç satar, hepsi **senin seviyende**.
   - Gümüş kılıçlar hasar, çelik kılıçlar kritik şansı ekler.
   - Seviye yükseldikçe nadir kılıçlar daha sık çıkar.
@@ -238,17 +277,26 @@ Her okulun 3 sevdiği kart türü de vardır. Bu türlerdeki kart bağları ×1,
 - **Okul setleri:** 2. kademeden itibaren boss'lar witcher okulu teçhizatı şemaları düşürür; bunları demirciye yaptırabilirsin.
 
 ### Gwent kartları
+
+![Kart koleksiyonu](docs/screenshots/collection.jpg)
+
 - Kartları alışkanlıklardan, öldürmelerden, zincir eşiklerinden ve tüccardan alınan fıçılardan kazanırsın.
 - Bir fraksiyona odaklanıp koleksiyonunu daha hızlı tamamlayabilir ya da hepsinden toplayabilirsin.
 - **Kart bağları:** aynı fraksiyon ve türden 5 kart, kalıcı hasar ekleyen bir bağ kurar. En fazla 10 bağın olabilir.
 - Tekrar gelen kartlar kırıntıya dönüşür. Kırıntıyla eksik kartları üretir, kılıç yükseltirsin.
 
 ### Karakterlerim
+
+![Karakterlerim sekmesi](docs/screenshots/characters.jpg)
+
 Son boss'tan sonra yeni bir karakter olarak **yeniden doğabilirsin**. Eski karakter Karakterlerim sekmesine taşınır ve sonraki bütün karakterlere bonus verir:
 - Her efsane için +%3 oren (en çok %15)
 - Her karakter için +%1 TP (en çok %10)
 
 ### Ayrıca
+
+![Kayıtlar ve uyku grafikleri](docs/screenshots/records.jpg)
+
 - Başarımlar ve haftalık özet, ayrıca uyku grafikleri.
 - Ses efektleri.
 - **Telefondan erişim:** aynı Wi‑Fi'deki bir telefondan açabilirsin, istersen PIN'le.
