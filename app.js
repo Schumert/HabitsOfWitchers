@@ -1,5 +1,5 @@
 /* Habits of Witchers — arayüz. Kurallar engine.js içinde.
- * Baslat.bat ile çalıştır. Test modu: Test.bat (ayrı veritabanı + zaman yolculuğu paneli).
+ * Start.bat ile çalıştır. Test modu: Test.bat (ayrı veritabanı + zaman yolculuğu paneli).
  */
 (() => {
 'use strict';
@@ -96,7 +96,7 @@ async function flush() {
     if (!saveFailed) {
       saveFailed = true;
       const b = document.createElement('div'); b.id = 'offline'; b.className = 'offline';
-      b.textContent = L('Sunucuya ulaşılamıyor, değişiklikler kaydedilmedi. Baslat.bat çalışıyor mu?', "Can't reach the server; changes weren't saved. Is the server (Baslat.bat / server.py) running?");
+      b.textContent = L('Sunucuya ulaşılamıyor, değişiklikler kaydedilmedi. Start.bat çalışıyor mu?', "Can't reach the server; changes weren't saved. Is the server (Start.bat / server.py) running?");
       document.body.appendChild(b);
     }
     setTimeout(save, 5000);
@@ -1413,7 +1413,7 @@ async function renderAccess() {
     const urls = (j.urls || []).map(u => `<li><code>${esc(u)}</code></li>`).join('') || `<li class="muted">${L('Ağ adresi bulunamadı', 'No network address found')}</li>`;
     box.innerHTML = `<p class="muted">${L("Telefonun bilgisayarla <b>aynı Wi‑Fi</b>'deyken uygulamayı telefonun tarayıcısından açabilirsin.", "While your phone is on the <b>same Wi‑Fi</b> as the computer, you can open the app in the phone's browser.")}</p>
       ${j.lan ? `<p>✅ ${L('<b>Açık.</b> Telefonda şu adresi aç:', '<b>On.</b> Open this address on your phone:')}</p><ul>${urls}</ul>
-        ${j.listening ? '' : `<p class="bad-text">${L('Sunucu eski sürümle çalışıyor: Baslat.bat penceresini bir kez kapatıp yeniden aç.', 'The server is running an old version: close the server window once and start it again.')}</p>`}
+        ${j.listening ? '' : `<p class="bad-text">${L('Sunucu eski sürümle çalışıyor: Start.bat penceresini bir kez kapatıp yeniden aç.', 'The server is running an old version: close the server window once and start it again.')}</p>`}
         <p class="hint">${L('Tarayıcı menüsünden "Ana ekrana ekle" dersen uygulama gibi açılır. Windows güvenlik duvarı izin sorarsa "Özel ağlar"a izin ver.', 'Use "Add to Home screen" in the browser menu to open it like an app. If the Windows firewall asks, allow "Private networks".')}</p>
         <div class="row"><button class="btn red" data-act="lanoff">${L('Telefondan erişimi kapat', 'Turn off phone access')}</button></div>`
       : `<p>${L('Kapalı.', 'Off.')}</p><div class="row"><button class="btn big" data-act="lanon">📱 ${L('Telefondan erişimi aç', 'Turn on phone access')}</button></div>
@@ -1592,8 +1592,8 @@ function showRulesEn() {
 function showFileMode() {
   const old = localStorage.getItem('kaermorhen_main');
   openModal(`<h2>${L('Habits of Witchers sunucuyla çalışıyor', 'Habits of Witchers runs with a server')}</h2>
-    <p>${L('Uygulamayı klasördeki <b>Baslat.bat</b> ile aç. Kayıtlar <b>hofw.db</b> dosyasında.', 'Start the app with <b>Baslat.bat</b> (or <code>python3 server.py</code>) in its folder. Your data lives in <b>hofw.db</b>.')}</p>
-    ${old ? `<p>${L('Bu tarayıcıda eski bir kaydın var. Baslat.bat çalışırken butona basarsan veritabanına taşınır.', 'This browser has an old save. Press the button while the server is running to move it into the database.')}</p><button class="btn big" data-act="migratefile">${L('Eski kaydımı taşı', 'Move my old save')}</button>` : ''}
+    <p>${L('Uygulamayı klasördeki <b>Start.bat</b> ile aç. Kayıtlar <b>hofw.db</b> dosyasında.', 'Start the app with <b>Start.bat</b> (or <code>python3 server.py</code>) in its folder. Your data lives in <b>hofw.db</b>.')}</p>
+    ${old ? `<p>${L('Bu tarayıcıda eski bir kaydın var. Start.bat çalışırken butona basarsan veritabanına taşınır.', 'This browser has an old save. Press the button while the server is running to move it into the database.')}</p><button class="btn big" data-act="migratefile">${L('Eski kaydımı taşı', 'Move my old save')}</button>` : ''}
     <p class="hint">${L('Sunucu açıksa', 'If the server is running')}: <a href="http://localhost:8642/">http://localhost:8642</a></p>`);
 }
 async function migrateFromFile() {
@@ -1607,7 +1607,7 @@ async function migrateFromFile() {
     localStorage.setItem('kaermorhen_migrated', localStorage.getItem('kaermorhen_main'));
     localStorage.removeItem('kaermorhen_main');
     location.href = 'http://localhost:8642/';
-  } catch { toast(L("Sunucuya ulaşılamadı. Önce Baslat.bat'ı çalıştır.", "Couldn't reach the server. Start it first (Baslat.bat or server.py)."), 'bad'); }
+  } catch { toast(L("Sunucuya ulaşılamadı. Önce Start.bat'ı çalıştır.", "Couldn't reach the server. Start it first (Start.bat or server.py)."), 'bad'); }
 }
 
 /* ---------- test modu paneli ---------- */
@@ -1729,7 +1729,7 @@ document.addEventListener('click', async e => {
       const r = await fetch('/api/lan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return toast(j.error || L('Değiştirilemedi.', "Couldn't change it."), 'bad');
-      toast(on ? (j.restart ? L('Açıldı. Baslat.bat penceresini bir kez kapatıp yeniden aç.', 'Turned on. Close the server window once and start it again.') : L('Telefondan erişim açıldı.', 'Phone access turned on.')) : L('Telefondan erişim kapatıldı.', 'Phone access turned off.'), on ? 'good' : '');
+      toast(on ? (j.restart ? L('Açıldı. Start.bat penceresini bir kez kapatıp yeniden aç.', 'Turned on. Close the server window once and start it again.') : L('Telefondan erişim açıldı.', 'Phone access turned on.')) : L('Telefondan erişim kapatıldı.', 'Phone access turned off.'), on ? 'good' : '');
       renderAccess(); break;
     }
     case 'rerollboard': { const r = +t.dataset.r; if (act(E.rerollBoard(r))) { boardSel.id = null; showBoard(r); } break; }
@@ -1959,7 +1959,7 @@ async function init() {
   try { s = await load(); }
   catch (e) {
     if (e.auth) return showPinLogin();
-    return openModal(`<h2>${L('Sunucuya ulaşılamadı', "Couldn't reach the server")}</h2><p>${L('Baslat.bat çalışıyor mu? Pencereyi kapattıysan yeniden aç.', 'Is the server (Baslat.bat / server.py) running? If you closed its window, start it again.')}</p><button class="btn" data-act="retry">${L('Tekrar dene', 'Try again')}</button>`);
+    return openModal(`<h2>${L('Sunucuya ulaşılamadı', "Couldn't reach the server")}</h2><p>${L('Start.bat çalışıyor mu? Pencereyi kapattıysan yeniden aç.', 'Is the server (Start.bat / server.py) running? If you closed its window, start it again.')}</p><button class="btn" data-act="retry">${L('Tekrar dene', 'Try again')}</button>`);
   }
   if (!s) return showOnboarding();
   E = createEngine(s, { now });

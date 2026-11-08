@@ -109,7 +109,7 @@ After the final boss you can be **reborn** as a new character. The old one moves
 You only need **Python 3.9+**. No extra packages.
 
 1. Download the repository.
-2. **Windows:** double-click `Baslat.bat`.
+2. **Windows:** double-click `Start.bat`.
    **macOS / Linux:** run `python3 server.py`.
 3. Card texts (`cards.js`, `cards-info.json`) come with the repository. To refresh them from gwent.one, run:
    ```
@@ -260,7 +260,7 @@ Son boss'tan sonra yeni bir karakter olarak **yeniden doğabilirsin**. Eski kara
 Gereken tek şey **Python 3.9+**. Ek paket yok.
 
 1. Depoyu indir.
-2. **Windows:** `Baslat.bat` dosyasına çift tıkla.
+2. **Windows:** `Start.bat` dosyasına çift tıkla.
    **macOS / Linux:** `python3 server.py` çalıştır.
 3. Kart metinleri (`cards.js`, `cards-info.json`) depoyla birlikte gelir. gwent.one'dan güncellemek istersen çalıştır:
    ```
