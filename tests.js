@@ -554,7 +554,8 @@ test('Mysterious Puzzle Box: sınırsız ama bekleyen bilmece varken alınmaz; k
   const late = t.E.answerPuzzle(D.CARD_BY_ART[qq.a].n); eq([late.correct, late.late], [false, true], 'geç cevap sayılmaz');
   isOk(t.E.buy('puzzle')); t.go('2026-11-05T21:02:00'); isOk(t.E.buy('puzzle'), 'süresi dolan eski bilmece kendiliğinden kapanır'); ok(!t.E.puzzleQuestion().expired);
   // ödül olasılıkları: kademe ağırlıkları kötüden iyiye azalır
-  const w = D.PUZZLE.tiers.map(t => t.w); ok(w.every((x, i) => i === 0 || x <= w[i - 1]), 'olasılık azalır');
+  for (const k of ['w', 'wCat']) { const w = D.PUZZLE.tiers.map(t => t[k]); ok(w.every((x, i) => i === 0 || x <= w[i - 1]), 'olasılık azalır: ' + k); }
+  ok(D.PUZZLE.tiers.flatMap(t => t.prizes).filter(p => p.id === 'scraps').map(p => p.n).join() === '40,100,250', 'kırıntı ödülleri');
 });
 test('Kart ödülleri açılmadan da verilir: fıçı ve kutu kartları hemen koleksiyona girer', () => {
   const { E, s } = setup({ idle: true });

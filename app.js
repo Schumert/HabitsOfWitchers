@@ -935,6 +935,13 @@ function showOddity(id, fresh = false) {
   setTimeout(() => { if ($('.mutagen-run')) { openModal(card, 'item-modal'); playSound('legendary'); } }, 2200);
 }
 
+/* Puzzle Box ödül olasılıkları (oyuncunun okuluna göre; Cat iyi ödülleri daha sık görür) */
+function puzzleOddsHtml() {
+  const cat = st().school === 'cat', tiers = DATA.PUZZLE.tiers, w = t => (cat ? t.wCat ?? t.w : t.w);
+  const tot = tiers.reduce((a, t) => a + w(t) * t.prizes.length, 0), pc = x => `${(Math.round(x * 1000) / 10).toLocaleString(L('tr-TR', 'en-US'))}`;
+  return `<table class="odds-table"><caption>${L('Doğru cevapta çıkabilecek ödüller', 'Possible prizes for a correct answer')}${cat ? ` · <span class="good">${L('Cat okulu: iyi ödüller daha sık', 'Cat School: better prizes more often')}</span>` : ''}</caption>
+    ${tiers.flatMap((t, ti) => t.prizes.map(p => `<tr><td><span class="odds-dot ${PRIZE_TIER[ti]}"></span>${esc(E.prizeName({ ...p, tier: ti }))}</td><td>${L('%' + pc(w(t) / tot), pc(w(t) / tot) + '%')}</td></tr>`)).join('')}</table>`;
+}
 /* büyük kart: altta özellik; tüccarda satın al, Eşyalarım'da kullan */
 function showItemDetail(id, mode) {
   const i = E.shopItems().find(x => x.id === id); if (!i) return;
@@ -958,6 +965,7 @@ function showItemDetail(id, mode) {
     ${artistSlot(i.art)}
     <p>${esc(i.desc)}</p>
     ${i.own ? `<p class="muted">${L('Elinde', 'You have')}: <b>${n}</b></p>` : ''}
+    ${i.id === 'puzzle' ? puzzleOddsHtml() : ''}
     ${i.id === 'mutagen' ? `<p class="muted">${E.oddLeft().length ? L(`İçinde hâlâ ${E.oddLeft().length} sürpriz var.`, `${E.oddLeft().length} surprise(s) still inside.`) : L('Tükendi: içinden çıkabilecek her şey çıktı.', 'Sold out: everything that could come out has.')}</p>` : ''}
     <div class="row" style="justify-content:center">${btns}<button class="btn ghost" data-act="close">${L('Kapat', 'Close')}</button></div></div>`, 'item-modal');
 }

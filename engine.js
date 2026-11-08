@@ -455,9 +455,9 @@ const ODDITIES = [
 const ODDITY_BY = Object.fromEntries(ODDITIES.map(o => [o.id, o]));
 /* Mysterious Puzzle Box: bilmeceyi bilince kasa açılır. Ödül kademeleri: kötüden iyiye olasılık azalır; aynı kademedekiler eşit şanslı. */
 const PUZZLE = { price: 50, secs: 30, grace: 2, tiers: [   // secs: cevap süresi (grace: ağ/tıklama payı)
-  { w: 24, wCat: 16, prizes: [{ id: 'keg' }, { id: 'gold', n: 100 }] },
-  { w: 10, wCat: 12, prizes: [{ id: 'gold', n: 200 }, { id: 'bigkeg' }, { id: 'scraps', n: 1 }] },
-  { w: 8, wCat: 11, prizes: [{ id: 'gold', n: 500 }, { id: 'scraps', n: 2 }] },
+  { w: 16, wCat: 12.5, prizes: [{ id: 'keg' }, { id: 'gold', n: 100 }, { id: 'scraps', n: 40 }] },   // normalde kademe toplamı aynı kaldı (%48); Cat'te de tek ödül şansı kötüden iyiye azalır
+  { w: 10, wCat: 12, prizes: [{ id: 'gold', n: 200 }, { id: 'bigkeg' }, { id: 'scraps', n: 100 }] },   // 1 kırıntı ≈ 2 oren
+  { w: 8, wCat: 11, prizes: [{ id: 'gold', n: 500 }, { id: 'scraps', n: 250 }] },
   { w: 6, wCat: 9, prizes: [{ id: 'gold', n: 1000 }] }] };   // wCat: Cat okulu (kumarbaz) iyi ödülleri daha sık görür
 const PUZZLE_STOP = new Set(['the', 'of', 'and', 'a', 'an', 'to', 'in', 'on', 'de', 'la', 'van', 'der', 'von', 'aep']);
 const puzzleWords = t => (t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').split(' ').filter(w => w.length >= 3 && !PUZZLE_STOP.has(w));

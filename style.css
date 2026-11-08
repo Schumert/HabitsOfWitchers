@@ -727,3 +727,9 @@ img.broken { opacity: 0; }
 .mini-result { padding: 10px 14px; border-radius: 8px; margin: 10px 0; border: 1px solid var(--line); }
 .mini-result.win { border-color: var(--green); }
 .mini-result.lose { border-color: var(--red); }
+.odds-table { width: 100%; max-width: 300px; border-collapse: collapse; font-size: .85rem; margin: 4px auto; }
+.odds-table caption { font-size: .8rem; color: var(--gold); padding-bottom: 4px; }
+.odds-table td { padding: 2px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+.odds-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.odds-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.odds-dot.t-blue { background: #4b69ff; } .odds-dot.t-purple { background: #8847ff; } .odds-dot.t-pink { background: #d32ce6; } .odds-dot.t-gold { background: #e4ae39; }
