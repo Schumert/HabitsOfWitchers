@@ -60,7 +60,7 @@ Each school changes how you play:
 | School | Strength |
 |---|---|
 | **Wolf** | Balanced: each link in a chain adds +5% to that habit's rewards (up to +50%) |
-| **Cat** | Gambler: monster rewards ×1.3, but you take ×1.5 damage |
+| **Cat** | Gambler: monster rewards ×1.3, better Puzzle Box prizes more often, daily game reward ×1.5; but you take ×1.5 damage |
 | **Bear** | Tough: ×1.4 HP, ×0.6 damage taken, and faster healing |
 | **Griffin** | Disciplined: atonement takes 1 day, and you never become Tired or Exhausted |
 | **Viper** | Punctual: do a habit early for ×1.4 rewards and +10% damage for 24 hours |
@@ -211,7 +211,7 @@ Her okul oyun tarzını değiştirir:
 | Okul | Gücü |
 |---|---|
 | **Wolf** | Dengeli: zincirdeki her halka o alışkanlığın ödülüne +%5 ekler (en çok +%50) |
-| **Cat** | Kumarbaz: canavar ödülleri ×1,3, ama aldığın hasar ×1,5 |
+| **Cat** | Kumarbaz: canavar ödülleri ×1,3, Puzzle Box'ta iyi ödüller daha sık, günlük oyun ödülü ×1,5; ama aldığın hasar ×1,5 |
 | **Bear** | Dayanıklı: can ×1,4, aldığın hasar ×0,6, daha hızlı iyileşme |
 | **Griffin** | Disiplinli: kefaret 1 gün sürer, ne Yorgun ne Bitkin olursun |
 | **Viper** | Dakik: alışkanlığı erken yaparsan ödül ×1,4 ve 24 saat hasar +%10 |

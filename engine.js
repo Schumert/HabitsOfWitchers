@@ -106,7 +106,7 @@ const SCRAP_PER_KILL = 1;                                                    // 
 
 const SCHOOLS = {
   wolf:    { name: 'Wolf School',    art: 1476, desc: 'Dengeli yol. Zincirindeki her halka o alışkanlığın ödülünü %5 artırır (en çok +%50). Sevdiği kart türleri: Witcher, Soldier, Beast.' },
-  cat:     { name: 'Cat School',     art: 2342, desc: 'Kumarbaz. Canavar ödülleri ×1.3, ama aldığın hasar ×1.5. Sevdiği kart türleri: Agent, Bandit, Crime.' },
+  cat:     { name: 'Cat School',     art: 2342, desc: 'Kumarbaz. Canavar ödülleri ×1.3, Puzzle Box’ta iyi ödüller daha sık, günlük oyun ödülü ×1.5; ama aldığın hasar ×1.5. Sevdiği kart türleri: Agent, Bandit, Crime.' },
   bear:    { name: 'Bear School',    art: 2352, desc: 'Dayanıklı. Can ×1.4, aldığın hasar ×0.6, avda saatte %0,5 iyileşirsin, yenilince iki kat hızlı toparlanırsın. Sevdiği kart türleri: Warrior, Dwarf, Ogroid.' },
   griffin: { name: 'Griffin School', art: 2362, desc: 'Disiplinli. Kırılan zincir için kefaret 2 yerine 1 gün; gecikince Yorgun, kaçırınca Bitkin olmazsın. Sevdiği kart türleri: Mage, Spell, Knight.' },
   viper:   { name: 'Viper School',   art: 2312, desc: 'Dakik. Görevi erken yaparsan (saatli türlerde aralığın ilk 10 dakikası, diğerlerinde öğleden önce) ödül ×1.4 ve 24 saat Odak: hasar +%10. Sevdiği kart türleri: Elf, Alchemy, Aristocrat.' },
@@ -116,7 +116,7 @@ const SCHOOLS = {
 const schoolImg = (id, q = 'medium') => { const x = SCHOOLS[id] || SCHOOLS.wolf; return x.img || ART(x.art, q); };
 const SCHOOL_EN = {
   wolf: "Balanced. Every link in a chain raises that habit's reward by 5% (up to +50%). Favoured card categories: Witcher, Soldier, Beast.",
-  cat: 'Gambler. Monster rewards ×1.3, but damage taken ×1.5. Favoured card categories: Agent, Bandit, Crime.',
+  cat: 'Gambler. Monster rewards ×1.3, better Puzzle Box prizes more often, daily game reward ×1.5; but damage taken ×1.5. Favoured card categories: Agent, Bandit, Crime.',
   bear: 'Tough. HP ×1.4, damage taken ×0.6, heals 0.5%/h while hunting and recovers twice as fast after a defeat. Favoured card categories: Warrior, Dwarf, Ogroid.',
   griffin: "Disciplined. Atonement for a broken chain takes 1 day instead of 2; being late doesn't make you Tired and missing a day doesn't make you Exhausted. Favoured card categories: Mage, Spell, Knight.",
   viper: 'Punctual. Do a quest early (first 10 minutes of the window for timed types, before noon for the others) for ×1.4 rewards and 24 hours of Focus: +10% damage. Favoured card categories: Elf, Alchemy, Aristocrat.',

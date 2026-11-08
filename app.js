@@ -1184,6 +1184,8 @@ const SCHOOL_INFO = {
     tag: ['Kumarbaz', 'The gambler'],
     mech: [
       ['Canavar ödülleri (oren) ×1,3.', 'Monster rewards (crowns) ×1.3.'],
+      ['Mysterious Puzzle Box’tan iyi ödüller daha sık çıkar (ör. 1000 oren %6 yerine ~%8,6).', 'Better prizes come out of the Mysterious Puzzle Box more often (e.g. 1000 crowns ~8.6% instead of 6%).'],
+      ['Günlük oyun ödülü seviye × 7,5 (diğer okullar × 5).', 'Daily game reward is level × 7.5 (other schools × 5).'],
       ['Ama aldığın hasar ×1,5 ve avda iyileşmen en yavaş (saatte %0,2).', 'But you take ×1.5 damage and heal slowest while hunting (0.2% per hour).'],
       ['En çok orenle (180) ve 20 kırıntıyla başlar; gümüş kılıcı yoktur, sadece çelik (kritik).', 'Starts with the most crowns (180) and 20 scraps; no silver sword, only steel (crits).'],
     ],
