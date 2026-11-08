@@ -94,6 +94,23 @@ def auth_token(cfg):
     return hmac.new(bytes.fromhex(cfg["secret"]), cfg["pin_hash"].encode(), "sha256").hexdigest()
 
 
+_HOSTS = {"t": 0, "v": set()}
+
+
+def allowed_hosts():
+    """Uygulamanın kendi adresleri: localhost, bu bilgisayarın ağ IP'leri ve adı. Başka bir ad (ör. DNS rebinding) reddedilir."""
+    if time.time() - _HOSTS["t"] > 60:
+        names = {"localhost", "127.0.0.1", "[::1]"}
+        names.update(lan_ips())
+        try:
+            hn = socket.gethostname().lower()
+            names.update({hn, hn + ".local"})
+        except OSError:
+            pass
+        _HOSTS.update(t=time.time(), v=names)
+    return _HOSTS["v"]
+
+
 def lan_ips():
     ips = set()
     try:
@@ -310,7 +327,6 @@ class Handler(SimpleHTTPRequestHandler):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -354,11 +370,31 @@ class Handler(SimpleHTTPRequestHandler):
         return False
 
     def do_OPTIONS(self):
+        # CORS ön kontrolüne izin verilmez: başka sitelerden gelen PUT/POST/DELETE tarayıcıda engellenir
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
+
+    def _cross_site(self):
+        """Başka bir siteden (ya da DNS rebinding ile) gelen API isteklerini reddeder.
+        Bu bilgisayardan gelen istekler PIN'siz kabul edildiği için, tarayıcıda açık başka bir sayfanın
+        localhost'a istek atıp kaydı okuması/değiştirmesi ya da telefondan erişimi açması böyle engellenir."""
+        host = (self.headers.get("Host") or "").strip().lower()
+        name = host.rsplit(":", 1)[0] if not host.startswith("[") else host.split("]")[0] + "]"
+        if name not in allowed_hosts() and not name.endswith((".localhost", ".local")):
+            return True
+        origin = (self.headers.get("Origin") or "").strip().lower()
+        if origin:
+            if origin == "null" or urlparse(origin).netloc != host:
+                return True
+        if (self.headers.get("Sec-Fetch-Site") or "").lower() == "cross-site":
+            return True
+        return False
+
+    def _reject_cross_site(self):
+        if self._cross_site():
+            self._json(403, {"error": "cross-site request blocked"})
+            return True
+        return False
 
     def _forbidden(self):
         """Veritabanı, kod, yedek ve ayar dosyaları (PIN özeti ve oturum anahtarı içerir) asla sunulmaz.
@@ -380,6 +416,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if (path.startswith("/api/") or path == "/img") and self._reject_cross_site():
+            return
         if path == "/api/access":
             cfg = load_config()
             return self._json(200, {"local": self._is_local(), "lan": bool(cfg.get("lan")), "pin": bool(cfg.get("pin_hash")), "listening": LISTENING["lan"],
@@ -402,6 +440,8 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_PUT(self):
+        if self._reject_cross_site():
+            return
         if urlparse(self.path).path != "/api/state":
             return self._json(404, {"error": "not found"})
         if not self._guard():
@@ -421,6 +461,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if self._reject_cross_site():
+            return
         if path == "/api/login":
             ip, nowt = self.client_address[0], time.time()
             fails, until = LOGIN_FAILS.get(ip, (0, 0))
@@ -468,7 +510,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_DELETE(self):
         # Sadece test kayıtları silinebilir; gerçek kayıt (main) asla.
-        if not self._guard():
+        if self._reject_cross_site() or not self._guard():
             return
         slot = self._slot()
         if urlparse(self.path).path != "/api/state" or db_path(slot) == db_path("main"):
