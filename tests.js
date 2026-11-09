@@ -531,7 +531,7 @@ test('Black Blood: 24 saat kritik +%10, Vampir/Nekrofaj +%15 daha; hasarı deği
   ok(s.counters.potions >= 1, 'iksir sayacı');
   go('2026-11-06T22:01'); eq(E.playerStats().crit, before.crit, '24 saat sonra biter');
 });
-test('Mysterious Puzzle Box: sınırsız ama bekleyen bilmece varken alınmaz; kelime eşleşmesi, ödül uygulanır', () => {
+test('Mysterious Puzzle Box: bekleyen bilmece varken alınmaz; kelime eşleşmesi, ödül uygulanır', () => {
   const { E, s, go } = setup({ idle: true });
   eq(D.SHOP.find(i => i.id === 'puzzle').price, 50);
   eq(D.puzzleWords("Geralt of Rivia"), ['geralt', 'rivia']); eq(D.puzzleWords('Dol Blathanna Archer!'), ['dol', 'blathanna', 'archer']);
@@ -543,7 +543,7 @@ test('Mysterious Puzzle Box: sınırsız ama bekleyen bilmece varken alınmaz; k
   const r = E.answerPuzzle('blah ' + word.toUpperCase()); ok(r.correct, 'tek kelime yeter: ' + name); ok(r.prize);
   eq(E.puzzleQuestion(), null);
   if (r.prize.id === 'gold') eq(s.gold, g + r.prize.n); if (r.prize.id === 'scraps') eq(s.scraps, sc + r.prize.n);
-  isOk(E.buy('puzzle'), 'günlük sınır yok'); const r2 = E.answerPuzzle('zzzz qqqq'); eq(r2.correct, false); eq(E.puzzleQuestion(), null, 'yanlışta kutu gider');
+  isOk(E.buy('puzzle'), 'ikinci kutu'); const r2 = E.answerPuzzle('zzzz qqqq'); eq(r2.correct, false); eq(E.puzzleQuestion(), null, 'yanlışta kutu gider');
   // 30 saniye süre: içinde doğru cevap geçer, süre dolunca doğru cevap da sayılmaz; süresi dolan bilmece yeni kutuyu engellemez
   eq(D.PUZZLE.secs, 30);
   const t = setup({ idle: true }); t.s.gold = 1000;
@@ -556,6 +556,14 @@ test('Mysterious Puzzle Box: sınırsız ama bekleyen bilmece varken alınmaz; k
   // ödül olasılıkları: kademe ağırlıkları kötüden iyiye azalır
   for (const k of ['w', 'wCat']) { const w = D.PUZZLE.tiers.map(t => t[k]); ok(w.every((x, i) => i === 0 || x <= w[i - 1]), 'olasılık azalır: ' + k); }
   ok(D.PUZZLE.tiers.flatMap(t => t.prizes).filter(p => p.id === 'scraps').map(p => p.n).join() === '40,100,250', 'kırıntı ödülleri');
+});
+test('Mysterious Puzzle Box: günde 5 stok, ertesi gün yenilenir', () => {
+  const { E, s, go } = setup({ idle: true }); s.gold = 10000;
+  eq(D.PUZZLE.daily, 5); eq(E.puzzleLeft(), 5);
+  for (let i = 0; i < 5; i++) { isOk(E.buy('puzzle'), 'kutu ' + (i + 1)); E.answerPuzzle('zzzz'); }
+  eq(E.puzzleLeft(), 0); ok(E.shopItems().find(i => i.id === 'puzzle').disabled, 'stok bitti');
+  isErr(E.buy('puzzle'), '6. kutu alınmaz');
+  go('2026-11-06T09:00'); eq(E.puzzleLeft(), 5, 'ertesi gün yenilenir'); isOk(E.buy('puzzle'));
 });
 test('Kart ödülleri açılmadan da verilir: fıçı ve kutu kartları hemen koleksiyona girer', () => {
   const { E, s } = setup({ idle: true });

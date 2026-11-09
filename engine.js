@@ -454,7 +454,7 @@ const ODDITIES = [
 ].map(o => bi(o, {}));
 const ODDITY_BY = Object.fromEntries(ODDITIES.map(o => [o.id, o]));
 /* Mysterious Puzzle Box: bilmeceyi bilince kasa açılır. Ödül kademeleri: kötüden iyiye olasılık azalır; aynı kademedekiler eşit şanslı. */
-const PUZZLE = { price: 50, secs: 30, grace: 2, tiers: [   // secs: cevap süresi (grace: ağ/tıklama payı)
+const PUZZLE = { price: 50, secs: 30, grace: 2, daily: 5, tiers: [   // daily: günlük stok   // secs: cevap süresi (grace: ağ/tıklama payı)
   { w: 16, wCat: 12.5, prizes: [{ id: 'keg' }, { id: 'gold', n: 100 }, { id: 'scraps', n: 40 }] },   // normalde kademe toplamı aynı kaldı (%48); Cat'te de tek ödül şansı kötüden iyiye azalır
   { w: 10, wCat: 12, prizes: [{ id: 'gold', n: 200 }, { id: 'bigkeg' }, { id: 'scraps', n: 100 }] },   // 1 kırıntı ≈ 2 oren
   { w: 8, wCat: 11, prizes: [{ id: 'gold', n: 500 }, { id: 'scraps', n: 250 }] },
@@ -471,7 +471,7 @@ const SHOP = [
   ...OWL.grades.map((g, i) => ({ id: g.id, lv: g.lv, name: ['Petri’s Philter', 'Gelişmiş Petri’s Philter', 'Üstün Petri’s Philter'][i],
     desc: `Alınca hemen içilir: +${g.xp} TP. Günde en fazla ${OWL.daily} Petri’s Philter (kademe fark etmez).`, price: g.price })),
   { id: 'blackblood', name: 'Black Blood', desc: `İçince ${BLACKBLOOD.hours} saat boyunca kritik şansın +%${BLACKBLOOD.crit}; Vampir ve Nekrofaj canavarlara karşı +%${BLACKBLOOD.vsCrit} daha. Thunderbolt'la birlikte içilebilir. Savaş panelinden ya da Eşyalarım'dan içersin. En fazla ${BLACKBLOOD.cap} tane.`, price: BLACKBLOOD.price },
-  { id: 'puzzle', name: 'Mysterious Puzzle Box', desc: `Açınca bir bilmece sorar: ya bir kartın resmini gösterip adını, ya da topladığın bir kartın sözünü gösterip hangi kart olduğunu. Adından tek bir kelimeyi bile doğru yazarsan kutu açılır ve rastgele bir ödül çıkar. Cevap için ${PUZZLE.secs} saniyen var; bu sırada kartlarına bakabilirsin. Önceki kutunun bilmecesi bitmeden yenisi alınamaz.`, price: PUZZLE.price },
+  { id: 'puzzle', name: 'Mysterious Puzzle Box', desc: `Açınca bir bilmece sorar: ya bir kartın resmini gösterip adını, ya da topladığın bir kartın sözünü gösterip hangi kart olduğunu. Adından tek bir kelimeyi bile doğru yazarsan kutu açılır ve rastgele bir ödül çıkar. Cevap için ${PUZZLE.secs} saniyen var; bu sırada kartlarına bakabilirsin. Önceki kutunun bilmecesi bitmeden yenisi alınamaz. Tüccarda günde ${PUZZLE.daily} tane var.`, price: PUZZLE.price },
   { id: 'mutagen', name: 'Mutagenerator', desc: 'Bir laboratuvar harikası… ya da felaketi. İçinden ne çıkacağı belli olmaz; aynı şey iki kez çıkmaz. Hepsi çıkınca tükenir.', price: MUTAGEN.price },
   { id: 'dancing', name: 'Dancing Star', desc: `Bomba: canavara rastgele ${DANCING.minH}–${DANCING.maxH} saatlik hasarın kadar vurur. Attıktan sonra ${DANCING.cooldown} saat yenisini atamazsın. Savaş panelinden ya da Eşyalarım'dan atarsın. En fazla ${DANCING.cap} tane.`, price: DANCING.price },
 ];
@@ -486,7 +486,7 @@ const SHOP_EN = {
   ...Object.fromEntries(OWL.grades.map((g, i) => [g.id, [['Petri’s Philter', 'Enhanced Petri’s Philter', 'Superior Petri’s Philter'][i],
     `Drunk on purchase: +${g.xp} XP. At most ${OWL.daily} Petri’s Philter a day (any grade).`]])),
   blackblood: ['Black Blood', `Drink it for +${BLACKBLOOD.crit}% crit chance for ${BLACKBLOOD.hours} hours; +${BLACKBLOOD.vsCrit}% more against Vampires and Necrophages. Can be combined with Thunderbolt. Drink it from the combat panel or My Items. Max ${BLACKBLOOD.cap}.`],
-  puzzle: ['Mysterious Puzzle Box', `Opening it poses a riddle: either a card's art and you name it, or the flavour text of a card you've collected and you name the card. Get even one word of the name right and the box opens with a random prize. You have ${PUZZLE.secs} seconds to answer; you can look through your cards meanwhile. You can't buy another until the previous riddle is over.`],
+  puzzle: ['Mysterious Puzzle Box', `Opening it poses a riddle: either a card's art and you name it, or the flavour text of a card you've collected and you name the card. Get even one word of the name right and the box opens with a random prize. You have ${PUZZLE.secs} seconds to answer; you can look through your cards meanwhile. You can't buy another until the previous riddle is over. The merchant has ${PUZZLE.daily} a day.`],
   mutagen: ['Mutagenerator', "A marvel of the laboratory… or a disaster. Who knows what comes out; nothing comes out twice. Sold out once everything has come out."],
   dancing: ['Dancing Star', `Bomb: hits the monster for a random ${DANCING.minH}–${DANCING.maxH} hours of your damage. After throwing one you can't throw another for ${DANCING.cooldown} hours. Throw it from the combat panel or My Items. Max ${DANCING.cap}.`],
 };
@@ -1995,12 +1995,14 @@ function createEngine(state, opts = {}) {
   function shopItems() {
     const owlFull = (atCap() && state.level < MAX_LEVEL && state.xp >= xpBank()) || owlToday() >= OWL.daily;   // seviye sınırında TP dolduysa boşa gider; günde 1
     const full = { swallow: state.swallow >= POTION.cap, honey: (state.honey || 0) >= honeyMax(), dancing: (state.dancing || 0) >= DANCING.cap,
-      blackblood: (state.blackblood || 0) >= BLACKBLOOD.cap, puzzle: !!state.puzzleQ && !puzzleLate(state.puzzleQ), mutagen: !oddLeft().length,
+      blackblood: (state.blackblood || 0) >= BLACKBLOOD.cap, puzzle: (!!state.puzzleQ && !puzzleLate(state.puzzleQ)) || puzzleToday() >= PUZZLE.daily, mutagen: !oddLeft().length,
       ...Object.fromEntries(THUNDER.grades.map(g => [g.id, (state[g.id] || 0) >= THUNDER.cap])), ...Object.fromEntries(OWL.grades.map(g => [g.id, owlFull])) };
     return SHOP.map(i => { const locked = (i.lv || 1) > (state.level || 1);
       return { ...i, price: ALCHEMY.includes(i.id) ? alchPrice(i.price) : i.price, locked, disabled: locked || !!full[i.id] }; });
   }
   const owlToday = () => (state.owlDay?.date === dk(now()) ? state.owlDay.n : 0);
+  const puzzleToday = () => (state.puzzleDay?.date === dk(now()) ? state.puzzleDay.n : 0);
+  const puzzleLeft = () => Math.max(0, PUZZLE.daily - puzzleToday());
   function buy(id) {
     const it = shopItems().find(i => i.id === id);
     if (!it) return err(L('Böyle bir şey yok.', 'No such item.'));
@@ -2017,7 +2019,7 @@ function createEngine(state, opts = {}) {
       log(L(`Mutagenerator homurdandı, köpürdü ve içinden… ${o.name} çıktı. ${o.desc}`, `The Mutagenerator rumbled, bubbled and out came… ${o.name}. ${o.desc}`), 'epic'); }
     if (id === 'blackblood') { state.blackblood = (state.blackblood || 0) + 1; log(L(`Black Blood aldın (${state.blackblood}/${BLACKBLOOD.cap}).`, `You bought Black Blood (${state.blackblood}/${BLACKBLOOD.cap}).`)); }
     if (id === 'puzzle') { if (state.puzzleQ) answerPuzzle('');   // süresi dolmuş eski bilmece kapanır
-      makePuzzle(); log(L('Mysterious Puzzle Box aldın. Bilmeceyi çöz, kutu açılsın.', 'You bought a Mysterious Puzzle Box. Solve the riddle to open it.')); }
+      state.puzzleDay = { date: dk(now()), n: puzzleToday() + 1 }; makePuzzle(); log(L('Mysterious Puzzle Box aldın. Bilmeceyi çöz, kutu açılsın.', 'You bought a Mysterious Puzzle Box. Solve the riddle to open it.')); }
     if (id === 'dancing') { state.dancing = (state.dancing || 0) + 1; log(L(`Dancing Star aldın (${state.dancing}/${DANCING.cap}).`, `You bought a Dancing Star (${state.dancing}/${DANCING.cap}).`)); }
     if (OWL_BY[id]) { const xp = OWL_BY[id].xp; state.owlDay = { date: dk(now()), n: owlToday() + 1 }; drank();
       log(L(`Bir ${it.name} içtin: +${xp} TP.`, `You drank a ${it.name}: +${xp} XP.`), 'good'); gainXp(xp); }
@@ -2362,7 +2364,7 @@ function createEngine(state, opts = {}) {
     prep: hid => on(hid, () => prep()), checkIn: hid => on(hid, () => checkIn()), addCount: (n, hid) => on(hid, () => addCount(n)), toggleItem: (name, hid) => on(hid, () => toggleItem(name)),
     continueMastery: hid => on(hid, () => continueMastery()), correctableDay: hid => on(hid, () => correctableDay()),
     correctMissed: (k, o = {}, hid) => on(hid ?? o.hid, () => correctMissed(k, o)),
-    habitById, chainDamage, advanceCombat, combatInfo, drinkPotion, drinkThunder, drinkBlackBlood, throwDancing, honeyMax, puzzleQuestion, answerPuzzle, prizeName, oddLeft, miniGame, playMini, startPractice, practiceGame, playPractice, failHit, playerStats, queueAdd, queueRemove, debuffPct, isRest, restTarget, restBy: k => restBy(k), restUsedInWeek, removeHabit, habitTypeName,
+    habitById, chainDamage, advanceCombat, combatInfo, drinkPotion, drinkThunder, drinkBlackBlood, throwDancing, honeyMax, puzzleQuestion, answerPuzzle, puzzleLeft, prizeName, oddLeft, miniGame, playMini, startPractice, practiceGame, playPractice, failHit, playerStats, queueAdd, queueRemove, debuffPct, isRest, restTarget, restBy: k => restBy(k), restUsedInWeek, removeHabit, habitTypeName,
     declareRest, processPending, completeSide, addSide, removeSide, shopItems, buy, craft,
     changeSchool, changeFaction, factionProgress, startQuest, updateQuest, init, drawCards, log,
     damageBonus, completeLinks, linkValue, linkOfCard, countedLinks, swordDmg, buffPct, buySword, equipSword, dailySwords, rerollShop, dismantleSword, dismantleValue, shopPrice,

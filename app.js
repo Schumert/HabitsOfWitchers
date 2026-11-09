@@ -845,7 +845,8 @@ const itemCap = i => ({ swallow: DATA.POTION.cap, honey: E.honeyMax(), dancing: 
 function itemCard(i, mode) {
   const n = itemOwned(i), s = st();
   const foot = mode === 'shop'
-    ? (i.locked ? `<span class="muted">🔒 ${L(`Sv ${i.lv}`, `Lv ${i.lv}`)}</span>` : i.id === 'mutagen' && !E.oddLeft().length ? `<span class="muted">${L('Tükendi', 'Sold out')}</span>` : `<span class="price ${s.gold < i.price ? 'short' : ''}">${i.price} 🪙</span>`)
+    ? (i.locked ? `<span class="muted">🔒 ${L(`Sv ${i.lv}`, `Lv ${i.lv}`)}</span>` : (i.id === 'mutagen' && !E.oddLeft().length) || (i.id === 'puzzle' && !E.puzzleLeft()) ? `<span class="muted">${L('Tükendi', 'Sold out')}</span>`
+      : `<span class="price ${s.gold < i.price ? 'short' : ''}">${i.price} 🪙</span>${i.id === 'puzzle' ? ` <small class="muted">${E.puzzleLeft()}/${DATA.PUZZLE.daily}</small>` : ''}`)
     : `<span class="muted">${n}/${itemCap(i)}</span>`;
   return `<div class="item-card ${i.locked ? 'is-locked' : ''}" data-act="item" data-id="${i.id}" data-mode="${mode}" title="${esc(i.name)}">
     ${cardHtml({ a: i.art, n: i.name, r: i.r }, { noAct: true, locked: i.locked })}
