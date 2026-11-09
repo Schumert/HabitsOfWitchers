@@ -105,22 +105,22 @@ const SWORD_UP = { goldShare: 0.35, scraps: L => 4 + Math.floor(L / 2) };
 const SCRAP_PER_KILL = 1;                                                    // kazanılan her dövüş 1 kırıntı
 
 const SCHOOLS = {
-  wolf:    { name: 'Wolf School',    art: 1476, desc: 'Dengeli yol. Zincirindeki her halka o alışkanlığın ödülünü %5 artırır (en çok +%50). Sevdiği kart türleri: Witcher, Soldier, Beast.' },
+  wolf:    { name: 'Wolf School',    art: 1476, desc: 'Dengeli yol. Zincirindeki her halka o alışkanlığın ödülünü %5 artırır (en çok +%50); yan görevler 3 kırıntı verir (günde ilk 5). Sevdiği kart türleri: Witcher, Soldier, Beast.' },
   cat:     { name: 'Cat School',     art: 2342, desc: 'Kumarbaz. Canavar ödülleri ×1.3, Puzzle Box’ta iyi ödüller daha sık, günlük oyun ödülü ×1.5; ama aldığın hasar ×1.5. Sevdiği kart türleri: Agent, Bandit, Crime.' },
   bear:    { name: 'Bear School',    art: 2352, desc: 'Dayanıklı. Can ×1.4, aldığın hasar ×0.6, avda saatte %0,5 iyileşirsin, yenilince iki kat hızlı toparlanırsın. Sevdiği kart türleri: Warrior, Dwarf, Ogroid.' },
-  griffin: { name: 'Griffin School', art: 2362, desc: 'Disiplinli. Kırılan zincir için kefaret 2 yerine 1 gün; gecikince Yorgun, kaçırınca Bitkin olmazsın. Sevdiği kart türleri: Mage, Spell, Knight.' },
+  griffin: { name: 'Griffin School', art: 2362, desc: 'Disiplinli. Kırılan zincir için kefaret 2 yerine 1 gün; gecikince Yorgun, kaçırınca Bitkin olmazsın; Mahakam Ale ona 24 saat hasar +%10 verir. Sevdiği kart türleri: Mage, Spell, Knight.' },
   viper:   { name: 'Viper School',   art: 2312, desc: 'Dakik. Görevi erken yaparsan (saatli türlerde aralığın ilk 10 dakikası, diğerlerinde öğleden önce) ödül ×1.4 ve 24 saat Odak: hasar +%10. Sevdiği kart türleri: Elf, Alchemy, Aristocrat.' },
-  manticore: { name: 'Manticore School', img: 'img/manticore.webp', desc: 'Simyacı. İksirleri yarı fiyatına alırsın (bombalar hariç); Dancing Star %30 daha sert vurur. Sevdiği kart türleri: Cursed, Relict, Vampire.' },
+  manticore: { name: 'Manticore School', img: 'img/manticore.webp', desc: 'Simyacı. İksirleri yarı fiyatına alırsın ve her birinden 3 fazla taşırsın; Dancing Star %30 daha sert vurur. Sevdiği kart türleri: Cursed, Relict, Vampire.' },
 };
 /* okulun görseli: Gwent kart resmi ya da yerel görsel */
 const schoolImg = (id, q = 'medium') => { const x = SCHOOLS[id] || SCHOOLS.wolf; return x.img || ART(x.art, q); };
 const SCHOOL_EN = {
-  wolf: "Balanced. Every link in a chain raises that habit's reward by 5% (up to +50%). Favoured card categories: Witcher, Soldier, Beast.",
+  wolf: "Balanced. Every link in a chain raises that habit's reward by 5% (up to +50%); side quests give 3 scraps (first 5 a day). Favoured card categories: Witcher, Soldier, Beast.",
   cat: 'Gambler. Monster rewards ×1.3, better Puzzle Box prizes more often, daily game reward ×1.5; but damage taken ×1.5. Favoured card categories: Agent, Bandit, Crime.',
   bear: 'Tough. HP ×1.4, damage taken ×0.6, heals 0.5%/h while hunting and recovers twice as fast after a defeat. Favoured card categories: Warrior, Dwarf, Ogroid.',
-  griffin: "Disciplined. Atonement for a broken chain takes 1 day instead of 2; being late doesn't make you Tired and missing a day doesn't make you Exhausted. Favoured card categories: Mage, Spell, Knight.",
+  griffin: "Disciplined. Atonement for a broken chain takes 1 day instead of 2; being late doesn't make you Tired and missing a day doesn't make you Exhausted; Mahakam Ale gives them +10% damage for 24 hours. Favoured card categories: Mage, Spell, Knight.",
   viper: 'Punctual. Do a quest early (first 10 minutes of the window for timed types, before noon for the others) for ×1.4 rewards and 24 hours of Focus: +10% damage. Favoured card categories: Elf, Alchemy, Aristocrat.',
-  manticore: 'Alchemist. Potions cost half (bombs excluded); Dancing Star hits 30% harder. Favoured card categories: Cursed, Relict, Vampire.',
+  manticore: 'Alchemist. Potions cost half and you can carry 3 more of each; Dancing Star hits 30% harder. Favoured card categories: Cursed, Relict, Vampire.',
 };
 Object.entries(SCHOOL_EN).forEach(([k, d]) => bi(SCHOOLS[k], { desc: d }));
 /* okula göre başlangıç donanımı. Wolf referans: 100 oren, 3 Swallow, 1 Mahakam Ale, gümüş + çelik kılıç.
@@ -199,7 +199,7 @@ const REGEN = { fight: { wolf: 0.003, bear: 0.005, griffin: 0.0035, viper: 0.002
 /* simya: Thunderbolt ve Petri’s Philter üç kademe (Normal / Gelişmiş 13. sv / Üstün 25. sv): etkiler ve fiyatlar sabit, güçlüsü pahalı.
  * Thunderbolt üst üste binmez (aynı anda tek etki), bu yüzden para "aynı zamandan daha çok hasar" için harcanır.
  * Petri’s Philter: günde en fazla 1 tane (kademe fark etmez). Dancing Star: rastgele 3–10 saatlik hasar, 48 saat bekleme süresi (can bedeli yok).
- * Manticore okulu iksirleri (Swallow, Mahakam Ale dahil; bombalar hariç) yarı fiyatına alır, Dancing Star'ı ×1,3 vurur. */
+ * Manticore okulu iksirleri (Swallow, Thunderbolt, Black Blood, Petri’s Philter) yarı fiyatına alır, Dancing Star'ı ×1,3 vurur. */
 const THUNDER = { hours: 24, cap: 5, stormcaller: 1.5, grades: [
   { id: 'thunder', pct: 20, price: 120, lv: 1 }, { id: 'thunder2', pct: 30, price: 300, lv: 13 }, { id: 'thunder3', pct: 40, price: 600, lv: 25 }] };
 const OWL = { grades: [
@@ -210,11 +210,13 @@ const BLACKBLOOD = { crit: 10, vsCrit: 15, vs: ['Vampire', 'Necrophage'], hours:
 const DANCING = { price: 120, cap: 5, cooldown: 48, alchhand: 30, manticore: 1.3, minH: 3, maxH: 10 };   // 3–10 saatlik hasar (rastgele, tam saat)
 const ALCH_DISCOUNT = 0.5;
 const WOUNDED = { below: 0.5, pct: 20 };                      // can %50'nin altındayken "Yaralı": hasar −%20
-const EFFECTS = { blackblood: { pct: BLACKBLOOD.crit, hours: BLACKBLOOD.hours, buff: true, crit: true }, tired: { pct: 15, hours: 12 }, exhausted: { pct: 30, hours: 24 }, drunk: { pct: 0, hours: 24, hurt: 2, once: true }, focus: { pct: 10, hours: 24, buff: true }, thunder: { pct: THUNDER.grades[0].pct, hours: THUNDER.hours, buff: true },
+const EFFECTS = { blackblood: { pct: BLACKBLOOD.crit, hours: BLACKBLOOD.hours, buff: true, crit: true }, tired: { pct: 15, hours: 12 }, exhausted: { pct: 30, hours: 24 }, drunk: { pct: 0, hours: 24, hurt: 2, once: true }, courage: { pct: 10, hours: 24, buff: true }, focus: { pct: 10, hours: 24, buff: true }, thunder: { pct: THUNDER.grades[0].pct, hours: THUNDER.hours, buff: true },
   early: { pct: 15, hours: 12, buff: true }, discipline: { pct: 20, hours: 24, buff: true } };   // early/discipline: kılıç özellikleri   // focus: Viper okulunun erken tamamlama ödülü
 const EFFECT_CAP = 60;
 const HONEY_MAX = 5;
-const DRUNK = EFFECTS.drunk;   // Mahakam Ale: Bitkin'i götürür ama 24 saat canavarın vuruşları ×2
+const MANTICORE_CARRY = 3;   // Manticore iksirlerden (Swallow, Thunderbolt, Black Blood) 3 fazla taşır
+const WOLF_SIDE = { scraps: 3, daily: 5 };   // Wolf: yan görev başına 3 kırıntı, günde ilk 5 görev
+const DRUNK = EFFECTS.drunk, COURAGE = EFFECTS.courage;   // Mahakam Ale: Bitkin'i götürür ama 24 saat canavarın vuruşları ×2; Griffin (Bitkin olmaz) bunun yerine 24 saat hasar +%10 alır
 const HEAVY = { chance: 0.05, hours: 0.75 };                 // canavarın ağır darbesi: adım başına %5, 45 dakikalık hasar      // boss TP'si normal: asıl ödülü yeni bölge          // boss: bölgenin en güçlüsünün katları
 const BOARD_SIZE = 5;                                               // haftalık kontrat tabelasındaki canavar sayısı
 const MON_HEAL = 0.05;
@@ -469,7 +471,7 @@ const SHOP = [
   { id: 'keg', name: 'Kart Fıçısı', desc: '3 kart, biri en az Nadir.', price: 60 },
   { id: 'bigkeg', name: 'Büyük Fıçı', desc: '5 kart, biri en az Destansı.', price: 180 },
   { id: 'swallow', name: 'Swallow', desc: `Can iksiri: en yüksek canının %${POTION.heal * 100}'si. Savaş panelinden ya da Eşyalarım'dan içersin. En fazla ${POTION.cap} tane.`, price: 100 },
-  { id: 'honey', name: 'Mahakam Ale', desc: `Bitkinken içersin: Bitkin hemen geçer ama ${DRUNK.hours} saat sarhoş olursun, canavarın vuruşları ×${DRUNK.hurt}. Zinciri korumaz. Savaş panelinden ya da Eşyalarım'dan içersin. En fazla ${HONEY_MAX} tane.`, price: 40 },
+  { id: 'honey', name: 'Mahakam Ale', desc: `Bitkinken içersin: Bitkin hemen geçer ama ${DRUNK.hours} saat sarhoş olursun, canavarın vuruşları ×${DRUNK.hurt}. Griffin okulu Bitkin olmadığı için onda her zaman içilir ve ${COURAGE.hours} saat hasar +%${COURAGE.pct} verir (sarhoşluk yine gelir). Zinciri korumaz. Savaş panelinden ya da Eşyalarım'dan içersin. En fazla ${HONEY_MAX} tane.`, price: 40 },
   ...THUNDER.grades.map((g, i) => ({ id: g.id, lv: g.lv, name: ['Thunderbolt', 'Gelişmiş Thunderbolt', 'Üstün Thunderbolt'][i],
     desc: `İçince ${THUNDER.hours} saat boyunca hasarın +%${g.pct}. Üst üste binmez: yenisi eskisinin yerine geçer. Savaş panelinden ya da Eşyalarım'dan içersin. En fazla ${THUNDER.cap} tane.`, price: g.price })),
   ...OWL.grades.map((g, i) => ({ id: g.id, lv: g.lv, name: ['Petri’s Philter', 'Gelişmiş Petri’s Philter', 'Üstün Petri’s Philter'][i],
@@ -479,12 +481,12 @@ const SHOP = [
   { id: 'mutagen', name: 'Mutagenerator', desc: 'Bir laboratuvar harikası… ya da felaketi. İçinden ne çıkacağı belli olmaz; aynı şey iki kez çıkmaz. Hepsi çıkınca tükenir.', price: MUTAGEN.price },
   { id: 'dancing', name: 'Dancing Star', desc: `Bomba: canavara rastgele ${DANCING.minH}–${DANCING.maxH} saatlik hasarın kadar vurur. Attıktan sonra ${DANCING.cooldown} saat yenisini atamazsın. Savaş panelinden ya da Eşyalarım'dan atarsın. En fazla ${DANCING.cap} tane.`, price: DANCING.price },
 ];
-const ALCHEMY = ['swallow', 'honey', 'blackblood', ...THUNDER.grades.map(g => g.id), ...OWL.grades.map(g => g.id)];   // Manticore indirimi bunlara (bombalar hariç)
+const ALCHEMY = ['swallow', 'blackblood', ...THUNDER.grades.map(g => g.id), ...OWL.grades.map(g => g.id)];   // Manticore indirimi bunlara
 const SHOP_EN = {
   keg: ['Card Keg', '3 cards, at least one Rare.'],
   bigkeg: ['Large Keg', '5 cards, at least one Epic.'],
   swallow: ['Swallow', `Healing potion: ${POTION.heal * 100}% of your max HP. Drink it from the combat panel or My Items. Max ${POTION.cap}.`],
-  honey: ['Mahakam Ale', `Drink it while Exhausted: Exhausted ends at once, but you're drunk for ${DRUNK.hours} hours and monster hits deal ×${DRUNK.hurt}. Doesn't protect the chain. Drink it from the combat panel or My Items. Max ${HONEY_MAX}.`],
+  honey: ['Mahakam Ale', `Drink it while Exhausted: Exhausted ends at once, but you're drunk for ${DRUNK.hours} hours and monster hits deal ×${DRUNK.hurt}. The Griffin School never gets Exhausted, so for them it can be drunk any time and gives +${COURAGE.pct}% damage for ${COURAGE.hours} hours (still drunk). Doesn't protect the chain. Drink it from the combat panel or My Items. Max ${HONEY_MAX}.`],
   ...Object.fromEntries(THUNDER.grades.map((g, i) => [g.id, [['Thunderbolt', 'Enhanced Thunderbolt', 'Superior Thunderbolt'][i],
     `Drink it for +${g.pct}% damage for ${THUNDER.hours} hours. Doesn't stack: a new one replaces the old. Drink it from the combat panel or My Items. Max ${THUNDER.cap}.`]])),
   ...Object.fromEntries(OWL.grades.map((g, i) => [g.id, [['Petri’s Philter', 'Enhanced Petri’s Philter', 'Superior Petri’s Philter'][i],
@@ -940,7 +942,7 @@ function createEngine(state, opts = {}) {
     let need;
     while (state.level < capLevel() && state.xp >= (need = xpNeed(state.level))) {
       state.xp -= need; state.level++; fx('level');
-      state.swallow = Math.min(POTION.cap, (state.swallow || 0) + 1);
+      state.swallow = Math.min(swallowCap(), (state.swallow || 0) + 1);
       log(L(`Seviye atladın! Artık ${state.level}. seviyesin. En yüksek canın ${maxHp()} oldu ve bir Swallow kazandın.`, `Level up! You are now level ${state.level}. Your max HP is now ${maxHp()}, and you earned a Swallow.`), 'epic');
       const bossRegs = bandInfo().regions.filter(x => REGIONS[x].boss && !killedSet().has(REGIONS[x].boss));
       if (state.level === capLevel() && !state.legend && bossRegs.length) {
@@ -963,7 +965,7 @@ function createEngine(state, opts = {}) {
       state.xp -= fameNeed(); state.fame = (state.fame || 0) + 1; fx('level');
       log(L(`Ün kazandın: ★${state.fame}. +${FAME.gold} oren ve bir Swallow.`, `Renown gained: ★${state.fame}. +${FAME.gold} crowns and a Swallow.`), 'epic');
       toast(L(`★${state.fame} Ün`, `★${state.fame} Renown`), 'good');
-      addGold(FAME.gold); state.swallow = Math.min(POTION.cap, (state.swallow || 0) + 1);
+      addGold(FAME.gold); state.swallow = Math.min(swallowCap(), (state.swallow || 0) + 1);
     }
   }
   /* --- etkiler (alışkanlık cezaları): hasarı düşürür, süre bitince kalkar --- */
@@ -976,7 +978,7 @@ function createEngine(state, opts = {}) {
     if (d.buff || d.once) state.effects = state.effects.filter(e => e.kind !== kind);   // güçlendirme üst üste binmez, süresi yenilenir
     const e = { id: uid(), kind, pct: d.pct, until: addMin(t, d.hours * 60).toISOString(), src };
     state.effects.push(e);
-    const nm = { tired: L('Yorgun', 'Tired'), exhausted: L('Bitkin', 'Exhausted'), focus: L('Odak', 'Focus'), thunder: 'Thunderbolt', early: uName('early'), discipline: uName('discipline') }[kind];
+    const nm = { tired: L('Yorgun', 'Tired'), exhausted: L('Bitkin', 'Exhausted'), courage: L('Cesaret', 'Courage'), focus: L('Odak', 'Focus'), thunder: 'Thunderbolt', early: uName('early'), discipline: uName('discipline') }[kind];
     if (d.crit || d.hurt) { /* iksir kendi günlüğünü yazar */ }
     else if (d.buff) log(L(`${nm}: ${d.hours} saat boyunca hasarın +%${d.pct}${src ? ` (${src})` : ''}.`, `${nm}: +${d.pct}% damage for ${d.hours} hours${src ? ` (${src})` : ''}.`), 'good');
     else log(L(`${nm}: ${d.hours} saat boyunca hasarın −%${d.pct}${src ? ` (${src})` : ''}.`, `${nm}: −${d.pct}% damage for ${d.hours} hours${src ? ` (${src})` : ''}.`), 'bad');
@@ -1302,8 +1304,8 @@ function createEngine(state, opts = {}) {
     const got = (id, what) => log(L(`${uName(id)}: ${what[0]}.`, `${uName(id)}: ${what[1]}.`), 'good');
     if (has('collector') && random() < 0.25) drawCards(1, 'Common', uName('collector'));
     if (has('trophy') && m.boss) drawCards(1, 'Legendary', uName('trophy'));
-    if (has('potionhunt') && random() < 0.3 && state.swallow < POTION.cap) { state.swallow++; got('potionhunt', ['bir Swallow buldun', 'you found a Swallow']); }
-    if (has('stormharvest') && random() < 0.2 && (state.thunder || 0) < THUNDER.cap) { state.thunder = (state.thunder || 0) + 1; got('stormharvest', ['bir Thunderbolt buldun', 'you found a Thunderbolt']); }
+    if (has('potionhunt') && random() < 0.3 && state.swallow < swallowCap()) { state.swallow++; got('potionhunt', ['bir Swallow buldun', 'you found a Swallow']); }
+    if (has('stormharvest') && random() < 0.2 && (state.thunder || 0) < thunderCap()) { state.thunder = (state.thunder || 0) + 1; got('stormharvest', ['bir Thunderbolt buldun', 'you found a Thunderbolt']); }
     if (has('starharvest') && random() < 0.2 && (state.dancing || 0) < DANCING.cap) { state.dancing = (state.dancing || 0) + 1; got('starharvest', ['bir Dancing Star buldun', 'you found a Dancing Star']); }
     if (has('harvest')) heal(0.25, 1);
   }
@@ -1314,6 +1316,8 @@ function createEngine(state, opts = {}) {
   const cbState = () => (state.combat ||= { t: now().toISOString(), mode: 'fight', until: null, last: {} });
   const potionHeal = () => Math.round(maxHp() * (has('swallowmaster') ? POTION.master : POTION.heal));
   const critMult = () => (has('deadly') ? 2 : CRIT_MULT);
+  const potExtra = () => (sc() === 'manticore' ? MANTICORE_CARRY : 0);
+  const swallowCap = () => POTION.cap + potExtra(), thunderCap = () => THUNDER.cap + potExtra(), bbCap = () => BLACKBLOOD.cap + potExtra();
   const honeyMax = () => (has('honeybearer') ? HONEY_MAX * 2 : HONEY_MAX);
   const alchPrice = p => (sc() === 'manticore' ? Math.round(p * ALCH_DISCOUNT) : p);
   const potionPrice = () => alchPrice(SHOP.find(i => i.id === 'swallow').price);
@@ -1374,13 +1378,19 @@ function createEngine(state, opts = {}) {
   const count = (k, n = 1) => { state.counters ||= {}; state.counters[k] = (state.counters[k] || 0) + n; };
   const drank = () => { state.stats.potions = (state.stats.potions || 0) + 1; count('potions'); };
   /* Mahakam Ale: elle içilir. Bitkin'i hemen kaldırır ama 24 saat sarhoşsun: canavarın vuruşları ×2. */
+  const canDrinkAle = () => sc() === 'griffin' || activeFx(clockNow()).some(e => e.kind === 'exhausted');
   function drinkAle() {
     if ((state.honey || 0) <= 0) return err(L('Mahakam Ale yok.', 'No Mahakam Ale left.'));
-    if (!activeFx(clockNow()).some(e => e.kind === 'exhausted')) return err(L('Bitkin değilsin.', "You aren't Exhausted."));
+    if (!canDrinkAle()) return err(L('Bitkin değilsin.', "You aren't Exhausted."));
     advanceCombat(now());
     state.honey--; drank();
-    state.effects = state.effects.filter(e => e.kind !== 'exhausted');
     addEffect('drunk', 'Mahakam Ale');
+    if (sc() === 'griffin') {   // Griffin Bitkin olmaz: Ale ona cesaret verir
+      addEffect('courage', 'Mahakam Ale');
+      log(L(`${DRUNK.hours} saat sarhoşsun: canavarın vuruşları ×${DRUNK.hurt}.`, `You're drunk for ${DRUNK.hours} hours: monster hits deal ×${DRUNK.hurt}.`), '');
+      return ok();
+    }
+    state.effects = state.effects.filter(e => e.kind !== 'exhausted');
     log(L(`Mahakam Ale içtin: Bitkin geçti ama ${DRUNK.hours} saat sarhoşsun, canavarın vuruşları ×${DRUNK.hurt}.`,
       `You drank Mahakam Ale: no longer Exhausted, but you're drunk for ${DRUNK.hours} hours and monster hits deal ×${DRUNK.hurt}.`), '');
     return ok();
@@ -1636,8 +1646,8 @@ function createEngine(state, opts = {}) {
     const eta = c && ps.dph > 0 ? c.hp / ps.dph : null;
     return { mode: cb.mode === 'rest' ? 'fight' : cb.mode, until: cb.until, dph: Math.round(ps.dph), crit: ps.crit, deb: ps.deb,
       hitLate: failHit(false, c), hitMiss: failHit(true, c),
-      eta, wounded: isWounded(), regen: { fight: regenFight(), idle: regenIdle() }, potions: state.swallow, potionCap: POTION.cap, potionHeal: potionHeal(), potionPrice: potionPrice(), honey: state.honey || 0,
-      thunderCap: THUNDER.cap, thunders: THUNDER.grades.filter(g => g.lv <= (state.level || 1) || (state[g.id] || 0) > 0).map((g, i) => ({ id: g.id, n: state[g.id] || 0, pct: thunderPct(g.id), price: alchPrice(g.price), locked: g.lv > (state.level || 1), name: SHOP.find(x => x.id === g.id).name })),
+      eta, wounded: isWounded(), regen: { fight: regenFight(), idle: regenIdle() }, potions: state.swallow, potionCap: swallowCap(), potionHeal: potionHeal(), potionPrice: potionPrice(), honey: state.honey || 0,
+      thunderCap: thunderCap(), thunders: THUNDER.grades.filter(g => g.lv <= (state.level || 1) || (state[g.id] || 0) > 0).map((g, i) => ({ id: g.id, n: state[g.id] || 0, pct: thunderPct(g.id), price: alchPrice(g.price), locked: g.lv > (state.level || 1), name: SHOP.find(x => x.id === g.id).name })),
       dancing: state.dancing || 0, dancingCap: DANCING.cap, dancingPrice: DANCING.price, dancingDmg: dancingDmg(), dancingMin: dancingDmg() * DANCING.minH, dancingMax: dancingDmg() * DANCING.maxH, dancingWait: dancingWait(), dancingCooldown: dancingCooldown(), aero: aeroOn() ? { charge: Math.min(AERO.max, state.aero?.charge || 0), max: AERO.max, toNext: (state.aero?.charge || 0) >= AERO.max ? null : AERO.hours - (state.aero?.h || 0), full: aeroFull(), next: aeroFull() ? AERO.every - ((state.aero?.n || 0) % AERO.every) : null, pct: AERO.per * Math.min(AERO.max, state.aero?.charge || 0) } : null,
       effects: (state.effects || []).filter(e => new Date(e.until) > now()) };
   }
@@ -1995,7 +2005,8 @@ function createEngine(state, opts = {}) {
     if (done.includes(id)) return err(L('Bugün zaten yapıldı.', 'Already done today.'));
     advanceCombat(now());
     done.push(id); addGold(+q.gold); gainXp(+q.xp);
-    log(L(`Yan görev tamamlandı: ${q.name}. +${q.xp} TP, +${q.gold} oren.`, `Side quest done: ${q.name}. +${q.xp} XP, +${q.gold} crowns.`), 'good');
+    const scr = sc() === 'wolf' && done.length <= WOLF_SIDE.daily ? WOLF_SIDE.scraps : 0; state.scraps += scr;
+    log(L(`Yan görev tamamlandı: ${q.name}. +${q.xp} TP, +${q.gold} oren${scr ? `, +${scr} kırıntı` : ''}.`, `Side quest done: ${q.name}. +${q.xp} XP, +${q.gold} crowns${scr ? `, +${scr} scraps` : ''}.`), 'good');
     return ok();
   }
   function addSide(name, xp, gold) {
@@ -2007,9 +2018,9 @@ function createEngine(state, opts = {}) {
   function removeSide(id) { state.quests = state.quests.filter(q => q.id !== id); return ok(); }
   function shopItems() {
     const owlFull = (atCap() && state.level < MAX_LEVEL && state.xp >= xpBank()) ;   // seviye sınırında TP dolduysa boşa gider
-    const full = { swallow: state.swallow >= POTION.cap, honey: (state.honey || 0) >= honeyMax(), dancing: (state.dancing || 0) >= DANCING.cap,
-      blackblood: (state.blackblood || 0) >= BLACKBLOOD.cap, puzzle: !!state.puzzleQ && !puzzleLate(state.puzzleQ), mutagen: !oddLeft().length,
-      ...Object.fromEntries(THUNDER.grades.map(g => [g.id, (state[g.id] || 0) >= THUNDER.cap])), ...Object.fromEntries(OWL.grades.map(g => [g.id, owlFull])) };
+    const full = { swallow: state.swallow >= swallowCap(), honey: (state.honey || 0) >= honeyMax(), dancing: (state.dancing || 0) >= DANCING.cap,
+      blackblood: (state.blackblood || 0) >= bbCap(), puzzle: !!state.puzzleQ && !puzzleLate(state.puzzleQ), mutagen: !oddLeft().length,
+      ...Object.fromEntries(THUNDER.grades.map(g => [g.id, (state[g.id] || 0) >= thunderCap()])), ...Object.fromEntries(OWL.grades.map(g => [g.id, owlFull])) };
     return SHOP.map(i => { const locked = (i.lv || 1) > (state.level || 1), left = stockLeft(i.id);
       return { ...i, price: ALCHEMY.includes(i.id) ? alchPrice(i.price) : i.price, locked, stock: left, stockMax: STOCK[stockKey(i.id)], disabled: locked || !!full[i.id] || left === 0 }; });
   }
@@ -2025,13 +2036,13 @@ function createEngine(state, opts = {}) {
     const sk = stockKey(id); if (STOCK[sk] != null) { const k = dk(now()); if (state.stockDay?.date !== k) state.stockDay = { date: k, n: {} }; state.stockDay.n[sk] = soldToday(sk) + 1; }
     if (id === 'keg') drawCards(3, 'Rare', it.name);
     if (id === 'bigkeg') drawCards(5, 'Epic', it.name);
-    if (id === 'swallow') { state.swallow++; log(L(`Swallow aldın (${state.swallow}/${POTION.cap}).`, `You bought a Swallow (${state.swallow}/${POTION.cap}).`)); }
+    if (id === 'swallow') { state.swallow++; log(L(`Swallow aldın (${state.swallow}/${swallowCap()}).`, `You bought a Swallow (${state.swallow}/${swallowCap()}).`)); }
     if (id === 'honey') { state.honey = (state.honey || 0) + 1; log(L(`Mahakam Ale aldın (${state.honey}/${honeyMax()}).`, `You bought Mahakam Ale (${state.honey}/${honeyMax()}).`)); }
-    if (THUNDER_BY[id]) { state[id] = (state[id] || 0) + 1; log(L(`${it.name} aldın (${state[id]}/${THUNDER.cap}).`, `You bought a ${it.name} (${state[id]}/${THUNDER.cap}).`)); }
+    if (THUNDER_BY[id]) { state[id] = (state[id] || 0) + 1; log(L(`${it.name} aldın (${state[id]}/${thunderCap()}).`, `You bought a ${it.name} (${state[id]}/${thunderCap()}).`)); }
     if (id === 'mutagen') { const left = oddLeft(), o = left[Math.floor(random() * left.length)];
       state.oddities = [...(state.oddities || []), o.id]; ev.oddity = o.id;
       log(L(`Mutagenerator homurdandı, köpürdü ve içinden… ${o.name} çıktı. ${o.desc}`, `The Mutagenerator rumbled, bubbled and out came… ${o.name}. ${o.desc}`), 'epic'); }
-    if (id === 'blackblood') { state.blackblood = (state.blackblood || 0) + 1; log(L(`Black Blood aldın (${state.blackblood}/${BLACKBLOOD.cap}).`, `You bought Black Blood (${state.blackblood}/${BLACKBLOOD.cap}).`)); }
+    if (id === 'blackblood') { state.blackblood = (state.blackblood || 0) + 1; log(L(`Black Blood aldın (${state.blackblood}/${bbCap()}).`, `You bought Black Blood (${state.blackblood}/${bbCap()}).`)); }
     if (id === 'puzzle') { if (state.puzzleQ) answerPuzzle('');   // süresi dolmuş eski bilmece kapanır
       makePuzzle(); log(L('Mysterious Puzzle Box aldın. Bilmeceyi çöz, kutu açılsın.', 'You bought a Mysterious Puzzle Box. Solve the riddle to open it.')); }
     if (id === 'dancing') { state.dancing = (state.dancing || 0) + 1; log(L(`Dancing Star aldın (${state.dancing}/${DANCING.cap}).`, `You bought a Dancing Star (${state.dancing}/${DANCING.cap}).`)); }
@@ -2378,7 +2389,7 @@ function createEngine(state, opts = {}) {
     prep: hid => on(hid, () => prep()), checkIn: hid => on(hid, () => checkIn()), addCount: (n, hid) => on(hid, () => addCount(n)), toggleItem: (name, hid) => on(hid, () => toggleItem(name)),
     continueMastery: hid => on(hid, () => continueMastery()), correctableDay: hid => on(hid, () => correctableDay()),
     correctMissed: (k, o = {}, hid) => on(hid ?? o.hid, () => correctMissed(k, o)),
-    habitById, chainDamage, advanceCombat, combatInfo, drinkPotion, drinkThunder, drinkBlackBlood, drinkAle, throwDancing, honeyMax, puzzleQuestion, answerPuzzle, stockLeft, prizeName, oddLeft, miniGame, playMini, startPractice, practiceGame, playPractice, failHit, playerStats, queueAdd, queueRemove, debuffPct, isRest, restTarget, restBy: k => restBy(k), restUsedInWeek, removeHabit, habitTypeName,
+    habitById, chainDamage, advanceCombat, combatInfo, drinkPotion, drinkThunder, drinkBlackBlood, drinkAle, canDrinkAle, throwDancing, honeyMax, swallowCap, thunderCap, bbCap, puzzleQuestion, answerPuzzle, stockLeft, prizeName, oddLeft, miniGame, playMini, startPractice, practiceGame, playPractice, failHit, playerStats, queueAdd, queueRemove, debuffPct, isRest, restTarget, restBy: k => restBy(k), restUsedInWeek, removeHabit, habitTypeName,
     declareRest, processPending, completeSide, addSide, removeSide, shopItems, buy, craft,
     changeSchool, changeFaction, factionProgress, startQuest, updateQuest, init, drawCards, log,
     damageBonus, completeLinks, linkValue, linkOfCard, countedLinks, swordDmg, buffPct, buySword, equipSword, dailySwords, rerollShop, dismantleSword, dismantleValue, shopPrice,

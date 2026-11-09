@@ -210,7 +210,7 @@ function renderTop() {
   $('#chainLen').textContent = best.chain.len;
   $('#chainLen').style.color = tier.color;
   $('#chainStat').title = s.habits.map(h => `${h.name}: ${h.chain.len} ${L('halka', 'links')} (${TIERS[tierOf(h.chain.len)].name})`).join('\n');
-  $('#swallow').textContent = `${s.swallow}/${POTION.cap}`;
+  $('#swallow').textContent = `${s.swallow}/${E.swallowCap()}`;
 }
 
 /* ---------- ana sayfa: bugünün alışkanlıkları ---------- */
@@ -377,7 +377,7 @@ function renderHunt() {
   const status = ci.mode === 'recover' ? `<div class="cb-status recover">🩹 ${L(`Yenildin; ${sfx(hm(new Date(ci.until)), 'e')} kadar toparlanıyorsun, sonra tam canla ava dönersin.`, `You were defeated; recovering until ${hm(new Date(ci.until))}, then you return at full HP.`)}</div>`
     : c ? `<div class="cb-status fight">⚔ ${L('Avdasın; uygulama kapalıyken de devam eder. Canavar sana sadece görevlerinde başarısız olunca vurur.', 'Hunting; it continues while the app is closed. The monster only hits you when you fail a quest.')}</div>` : '';
   const wound = ci.wounded ? `<span class="effect exhausted" title="${L('Canın %50 altında', 'HP below 50%')}">🩸 ${L('Yaralı', 'Wounded')} −20%</span>` : '';
-  const effects = ci.effects.length || wound ? `<div class="cb-effects">${wound}${ci.effects.map(e => `<span class="effect ${e.kind}" title="${esc(e.src || '')}">${e.kind === 'tired' ? '😩 ' + L('Yorgun', 'Tired') + ` −${e.pct}%` : e.kind === 'focus' ? '🎯 ' + L('Odak', 'Focus') + ` +${e.pct}%` : e.kind === 'thunder' ? `⚡ Thunderbolt +${e.pct}%` : e.kind === 'drunk' ? `🍺 ${L('Sarhoş', 'Drunk')} · ${L('vuruşlar', 'hits')} ×${DATA.EFFECTS.drunk.hurt}` : e.kind === 'blackblood' ? `🩸 Black Blood +${L('%' + e.pct, e.pct + '%')} ${L('kritik', 'crit')}` : e.kind === 'early' || e.kind === 'discipline' ? `✦ ${esc(DATA.UNIQUE_BY_ID[e.kind].name)} +${e.pct}%` : '🥀 ' + L('Bitkin', 'Exhausted') + ` −${e.pct}%`} · ${fmtDur(new Date(e.until) - now())}</span>`).join('')}
+  const effects = ci.effects.length || wound ? `<div class="cb-effects">${wound}${ci.effects.map(e => `<span class="effect ${e.kind}" title="${esc(e.src || '')}">${e.kind === 'tired' ? '😩 ' + L('Yorgun', 'Tired') + ` −${e.pct}%` : e.kind === 'focus' ? '🎯 ' + L('Odak', 'Focus') + ` +${e.pct}%` : e.kind === 'thunder' ? `⚡ Thunderbolt +${e.pct}%` : e.kind === 'courage' ? `🍺 ${L('Cesaret', 'Courage')} +${L('%' + e.pct, e.pct + '%')}` : e.kind === 'drunk' ? `🍺 ${L('Sarhoş', 'Drunk')} · ${L('vuruşlar', 'hits')} ×${DATA.EFFECTS.drunk.hurt}` : e.kind === 'blackblood' ? `🩸 Black Blood +${L('%' + e.pct, e.pct + '%')} ${L('kritik', 'crit')}` : e.kind === 'early' || e.kind === 'discipline' ? `✦ ${esc(DATA.UNIQUE_BY_ID[e.kind].name)} +${e.pct}%` : '🥀 ' + L('Bitkin', 'Exhausted') + ` −${e.pct}%`} · ${fmtDur(new Date(e.until) - now())}</span>`).join('')}
       ${ci.deb ? `<small class="muted">${L(`Toplam hasar cezası −%${ci.deb}`, `Total damage penalty −${ci.deb}%`)}</small>` : ''}</div>` : '';
   const potions = `<div class="cb-potions">
       <span title="${L(`İçince +${ci.potionHeal} can. Can avda saatte %${+(ci.regen.fight * 100).toFixed(2)} dolar; yenilince saatte %${Math.round(ci.regen.idle * 100)} toparlanırsın.`, `Drinking gives +${ci.potionHeal} HP. HP regenerates ${+(ci.regen.fight * 100).toFixed(2)}%/h while hunting; after a defeat you recover ${Math.round(ci.regen.idle * 100)}%/h.`)}">🧪 Swallow <b>${ci.potions}/${ci.potionCap}</b></span>
@@ -386,16 +386,16 @@ function renderHunt() {
       </div>
     <div class="cb-potions">
       <span title="${esc(DATA.SHOP.find(i => i.id === 'honey').desc)}">🍺 Mahakam Ale <b>${ci.honey}/${E.honeyMax()}</b></span>
-      <button class="btn sm" data-act="itemuse" data-id="honey" ${ci.honey < 1 || !ci.effects.some(e => e.kind === 'exhausted') ? 'disabled' : ''} title="${L('Bitkin geçer, 24 saat canavar vuruşları ×2', 'Ends Exhausted; monster hits ×2 for 24 hours')}">🍺 ${L('İç', 'Drink')}</button>
+      <button class="btn sm" data-act="itemuse" data-id="honey" ${ci.honey < 1 || !E.canDrinkAle() ? 'disabled' : ''} title="${L('Bitkin geçer, 24 saat canavar vuruşları ×2 (Griffin: hasar +%10)', 'Ends Exhausted; monster hits ×2 for 24 hours (Griffin: +10% damage)')}">🍺 ${L('İç', 'Drink')}</button>
       <button class="btn sm ghost" data-act="buy" data-id="honey" ${ci.honey >= E.honeyMax() || s.gold < E.shopItems().find(i => i.id === 'honey').price ? 'disabled' : ''}>${L('Al', 'Buy')} · ${E.shopItems().find(i => i.id === 'honey').price} 🪙</button></div>
     ${ci.thunders.map(t => `<div class="cb-potions">
       <span title="${L(`${DATA.THUNDER.hours} saat boyunca hasar +%${t.pct}. Üst üste binmez: yenisi eskisinin yerine geçer.`, `+${t.pct}% damage for ${DATA.THUNDER.hours} hours. Doesn't stack: a new one replaces the old.`)}">⚡ ${esc(t.name)} +${L('%' + t.pct, t.pct + '%')} <b>${t.n}/${ci.thunderCap}</b></span>
       <button class="btn sm" data-act="thunder" data-id="${t.id}" ${t.n < 1 ? 'disabled' : ''}>⚡ ${L('İç', 'Drink')}</button>
       ${t.locked ? '' : `<button class="btn sm ghost" data-act="buy" data-id="${t.id}" ${t.n >= ci.thunderCap || s.gold < t.price ? 'disabled' : ''}>${L('Al', 'Buy')} · ${t.price} 🪙</button>`}</div>`).join('')}
     <div class="cb-potions">
-      <span title="${esc(DATA.SHOP.find(i => i.id === 'blackblood').desc)}">🩸 Black Blood <b>${s.blackblood || 0}/${DATA.BLACKBLOOD.cap}</b></span>
+      <span title="${esc(DATA.SHOP.find(i => i.id === 'blackblood').desc)}">🩸 Black Blood <b>${s.blackblood || 0}/${E.bbCap()}</b></span>
       <button class="btn sm" data-act="itemuse" data-id="blackblood" ${(s.blackblood || 0) < 1 ? 'disabled' : ''}>🩸 ${L('İç', 'Drink')}</button>
-      <button class="btn sm ghost" data-act="buy" data-id="blackblood" ${(s.blackblood || 0) >= DATA.BLACKBLOOD.cap || s.gold < E.shopItems().find(i => i.id === 'blackblood').price ? 'disabled' : ''}>${L('Al', 'Buy')} · ${E.shopItems().find(i => i.id === 'blackblood').price} 🪙</button></div>
+      <button class="btn sm ghost" data-act="buy" data-id="blackblood" ${(s.blackblood || 0) >= E.bbCap() || s.gold < E.shopItems().find(i => i.id === 'blackblood').price ? 'disabled' : ''}>${L('Al', 'Buy')} · ${E.shopItems().find(i => i.id === 'blackblood').price} 🪙</button></div>
     <div class="cb-potions">
       <span title="${L(`Canavara ${ci.dancingMin}–${ci.dancingMax} hasar (3–10 saatlik). Attıktan sonra ${ci.dancingCooldown} saat yenisi atılamaz.`, `${ci.dancingMin}–${ci.dancingMax} damage to the monster (3–10 hours' worth). After a throw you must wait ${ci.dancingCooldown} hours.`)}">✴ Dancing Star <b>${ci.dancing}/${ci.dancingCap}</b></span>
       <button class="btn sm" data-act="dancing" ${ci.dancing < 1 || !c || ci.mode === 'recover' || ci.dancingWait > 0 ? 'disabled' : ''} title="${L(`${ci.dancingMin}–${ci.dancingMax} hasar`, `${ci.dancingMin}–${ci.dancingMax} damage`)}">✴ ${ci.dancingWait > 0 ? `⏳ ${fmtDur(ci.dancingWait)}` : `${L('At', 'Throw')} · ${ci.dancingMin}–${ci.dancingMax}`}</button>
@@ -844,7 +844,7 @@ function renderBestiary() {
 
 /* ---------- tüccar kartları + Eşyalarım ---------- */
 const itemOwned = i => (i.own ? st()[i.own] || 0 : 0);
-const itemCap = i => ({ swallow: DATA.POTION.cap, honey: E.honeyMax(), dancing: DATA.DANCING.cap, blackblood: DATA.BLACKBLOOD.cap }[i.own] ?? DATA.THUNDER.cap);
+const itemCap = i => ({ swallow: E.swallowCap(), honey: E.honeyMax(), dancing: DATA.DANCING.cap, blackblood: E.bbCap() }[i.own] ?? E.thunderCap());
 /* küçük kart: tıklayınca showItemDetail büyütür */
 function itemCard(i, mode) {
   const n = itemOwned(i), s = st();
@@ -962,7 +962,7 @@ function showItemDetail(id, mode) {
     else if (i.own === 'blackblood') btns = `<button class="btn" data-act="itemuse" data-id="blackblood" ${n < 1 ? 'disabled' : ''}>🩸 ${L('İç', 'Drink')}</button>`;
     else if (i.own?.startsWith('thunder')) btns = `<button class="btn" data-act="itemuse" data-id="${i.own}" ${n < 1 ? 'disabled' : ''}>⚡ ${L('İç', 'Drink')}</button>`;
     else if (i.own === 'dancing') btns = `<button class="btn" data-act="itemuse" data-id="dancing" ${n < 1 || !s.contract || ci.mode === 'recover' || ci.dancingWait > 0 ? 'disabled' : ''}>✴ ${ci.dancingWait > 0 ? `⏳ ${fmtDur(ci.dancingWait)}` : `${L('At', 'Throw')} · ${ci.dancingMin}–${ci.dancingMax}`}</button>`;
-    else if (i.own === 'honey') btns = `<button class="btn" data-act="itemuse" data-id="honey" ${n < 1 || !ci.effects.some(e => e.kind === 'exhausted') ? 'disabled' : ''}>🍺 ${L('İç', 'Drink')}</button>`;
+    else if (i.own === 'honey') btns = `<button class="btn" data-act="itemuse" data-id="honey" ${n < 1 || !E.canDrinkAle() ? 'disabled' : ''}>🍺 ${L('İç', 'Drink')}</button>`;
   }
   openModal(`<div class="item-detail">
     ${cardHtml({ a: i.art, n: i.name, r: i.r }, { q: 'medium', noAct: true, locked: i.locked })}
@@ -1179,6 +1179,7 @@ const SCHOOL_INFO = {
     tag: ['Dengeli yol', 'The balanced path'],
     mech: [
       ['Zincirindeki her halka o alışkanlığın ödülünü (oren ve TP) %5 artırır, en çok +%50 (10 halka).', 'Every link in a chain raises that habit\'s reward (crowns and XP) by 5%, up to +50% (10 links).'],
+      ['Yan görev başına 3 kırıntı (günde ilk 5 görev).', '3 scraps per side quest (first 5 a day).'],
       ['Ceza ya da zayıflık yok: hasar aldığın oran, canın ve iyileşmen standart (avda saatte %0,3).', 'No drawbacks: damage taken, HP and healing are all standard (0.3% per hour while hunting).'],
       ['Gümüş ve çelik kılıçla başlar: tek okul ikisini birden verir.', 'Starts with both a silver and a steel sword.'],
     ],
@@ -1212,6 +1213,7 @@ const SCHOOL_INFO = {
     mech: [
       ['Kırılan zincir için kefaret 2 yerine 1 gün.', 'Atonement for a broken chain takes 1 day instead of 2.'],
       ['Gecikince Yorgun, kaçırınca Bitkin olmazsın (canavar yine vurur).', 'You never become Tired when late or Exhausted when you miss (the monster still strikes).'],
+      ['Mahakam Ale her zaman içilir: 24 saat hasar +%10, ama sarhoşken canavar vuruşları ×2.', 'Mahakam Ale can be drunk any time: +10% damage for 24 hours, but monster hits ×2 while drunk.'],
       ['40 kırıntı ve 2 Mahakam Ale ile başlar; sadece gümüş kılıç.', 'Starts with 40 scraps and 2 Mahakam Ale; silver sword only.'],
     ],
     lore: ['Grifon Okulu, Kovir kıyısında, denize bakan uçurumların üstündeki Kaer Seren\'de kuruldu. İşaret\'lere ve zihin disiplinine diğer okullardan çok önem verir; witcher\'ları bir şövalye gibi sözüne sadık olmakla bilinir. Kale çoktan terk edildi, ama Grifon\'lar yemine bağlılıklarını sürdürdü. Kurt Okulu\'nda kış geçiren Poviss\'li Coën bu okulda yetişmişti.',
@@ -1230,7 +1232,8 @@ const SCHOOL_INFO = {
   manticore: {
     tag: ['Simyacı', 'The alchemist'],
     mech: [
-      ['İksirleri (Swallow, Mahakam Ale, Thunderbolt, Petri’s Philter) yarı fiyatına alırsın; bombalar hariç.', 'Potions (Swallow, Mahakam Ale, Thunderbolt, Petri’s Philter) cost half; bombs excluded.'],
+      ['İksirleri (Swallow, Thunderbolt, Black Blood, Petri’s Philter) yarı fiyatına alırsın.', 'Potions (Swallow, Thunderbolt, Black Blood, Petri’s Philter) cost half.'],
+      ['Swallow, Thunderbolt ve Black Blood’dan 3 fazla taşırsın (5 yerine 8).', 'You can carry 3 more Swallow, Thunderbolt and Black Blood (8 instead of 5).'],
       ['Dancing Star %30 daha sert vurur.', 'Dancing Star hits 30% harder.'],
       ['Az orenle (80) ama 1 Thunderbolt ve 3 Dancing Star ile başlar.', 'Starts with few crowns (80) but 1 Thunderbolt and 3 Dancing Stars.'],
     ],

@@ -73,12 +73,12 @@ Each school changes how you play:
 
 | School | Strength |
 |---|---|
-| **Wolf** | Balanced: each link in a chain adds +5% to that habit's rewards (up to +50%) |
+| **Wolf** | Balanced: each link in a chain adds +5% to that habit's rewards (up to +50%); side quests give 3 scraps (first 5 a day) |
 | **Cat** | Gambler: monster rewards ×1.3, better Puzzle Box prizes more often, daily game reward ×1.5; but you take ×1.5 damage |
 | **Bear** | Tough: ×1.4 HP, ×0.6 damage taken, and faster healing |
 | **Griffin** | Disciplined: atonement takes 1 day, and you never become Tired or Exhausted |
 | **Viper** | Punctual: do a habit early for ×1.4 rewards and +10% damage for 24 hours |
-| **Manticore** | Alchemist: potions cost half, and Dancing Star hits 30% harder |
+| **Manticore** | Alchemist: potions cost half and you carry 3 more of each; Dancing Star hits 30% harder |
 
 Each school also has 3 favourite card categories. Card links in those categories are worth ×1.5. The Schools tab in the app explains each school's mechanics and lore.
 
@@ -250,12 +250,12 @@ Her okul oyun tarzını değiştirir:
 
 | Okul | Gücü |
 |---|---|
-| **Wolf** | Dengeli: zincirdeki her halka o alışkanlığın ödülüne +%5 ekler (en çok +%50) |
+| **Wolf** | Dengeli: zincirdeki her halka o alışkanlığın ödülüne +%5 ekler (en çok +%50); yan görevler 3 kırıntı verir (günde ilk 5) |
 | **Cat** | Kumarbaz: canavar ödülleri ×1,3, Puzzle Box'ta iyi ödüller daha sık, günlük oyun ödülü ×1,5; ama aldığın hasar ×1,5 |
 | **Bear** | Dayanıklı: can ×1,4, aldığın hasar ×0,6, daha hızlı iyileşme |
 | **Griffin** | Disiplinli: kefaret 1 gün sürer, ne Yorgun ne Bitkin olursun |
 | **Viper** | Dakik: alışkanlığı erken yaparsan ödül ×1,4 ve 24 saat hasar +%10 |
-| **Manticore** | Simyacı: iksirler yarı fiyatına, Dancing Star %30 daha sert vurur |
+| **Manticore** | Simyacı: iksirler yarı fiyatına ve her birinden 3 fazla taşırsın, Dancing Star %30 daha sert vurur |
 
 Her okulun 3 sevdiği kart türü de vardır. Bu türlerdeki kart bağları ×1,5 değerlidir. Uygulamadaki Okullar sekmesi her okulun oynanışını ve hikâyesini anlatır.
 

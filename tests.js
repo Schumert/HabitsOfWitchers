@@ -658,11 +658,25 @@ test('Başarımlar: Aerondight, 50 iksir, okul değiştirme', () => {
   s.swords.owned.push(D.SWORDS.find(w => w.tier === 6).id); E.checkAchievements(); ok(has('aerondight'), 'Aerondight');
   s.counters.potions = 49; s.swallow = 1; s.hp = 1; isOk(E.drinkPotion()); E.checkAchievements(); ok(has('potions-50'), '50 iksir');
 });
+test('Wolf: yan görev 3 kırıntı (günde ilk 5); diğer okullar vermez', () => {
+  const { E, s } = setup({ idle: true }); s.school = 'wolf';
+  for (let i = 0; i < 6; i++) E.addSide('yan ' + i, 5, 0);
+  const sc0 = s.scraps; s.quests.forEach(q => isOk(E.completeSide(q.id)));
+  eq(s.scraps - sc0, 15, '6 görevden ilk 5i kırıntı verir');
+  const o = setup({ idle: true }); o.s.school = 'bear'; o.E.addSide('yan', 5, 0); const b0 = o.s.scraps;
+  isOk(o.E.completeSide(o.s.quests[0].id)); eq(o.s.scraps, b0);
+});
+test('Manticore: iksirlerden 3 fazla taşır (Swallow, Thunderbolt, Black Blood), Ale ve bomba hariç', () => {
+  const { E, s } = setup({ idle: true }); s.school = 'manticore';
+  eq([E.swallowCap(), E.thunderCap(), E.bbCap(), E.honeyMax()], [D.POTION.cap + 3, D.THUNDER.cap + 3, D.BLACKBLOOD.cap + 3, 5]);
+  s.gold = 10000; s.swallow = D.POTION.cap; isOk(E.buy('swallow'), '5in üstüne alınır');
+  s.school = 'wolf'; eq(E.swallowCap(), D.POTION.cap);
+});
 test('Manticore: iksirler yarı fiyatına, bombalar değil; başlangıç donanımı', () => {
   const { E, s } = setup({ school: 'manticore' });
   const price = id => E.shopItems().find(i => i.id === id).price;
   eq([price('swallow'), price('honey'), price('thunder'), price('thunder3'), price('owl'), price('owl2'), price('dancing')],
-    [D.SHOP.find(i => i.id === 'swallow').price / 2, 20, 60, 300, 25, 75, D.DANCING.price]);
+    [D.SHOP.find(i => i.id === 'swallow').price / 2, 40, 60, 300, 25, 75, D.DANCING.price]);
   eq(E.combatInfo().dancingPrice, D.DANCING.price, 'savaş panelinde de indirimsiz');
   eq(price('keg'), 60, 'kart fıçısı indirimsiz');
   eq(E.combatInfo().potionPrice, D.SHOP.find(i => i.id === 'swallow').price / 2);
@@ -982,6 +996,14 @@ test('Sonradan işleme: aralık sonrası saat gecikme sayılır; Bitkin kalkar',
   go('2026-11-07T09:31'); ok(s.effects.some(e => e.kind === 'exhausted'));
   go('2026-11-07T12:00'); isOk(E.correctMissed('2026-11-07', { wake: '09:00' }));
   eq(s.days['2026-11-07'].result, 'late'); ok(!s.effects.some(e => e.kind === 'exhausted'), 'Bitkin geri alındı'); eq(s.chain.rust, true);
+});
+test('Mahakam Ale (Griffin): her zaman içilir, 24 saat hasar +%10 ve Sarhoş', () => {
+  const { E, s } = setup({ idle: true }); s.school = 'griffin'; s.honey = 1;
+  const dph = E.playerStats().dph;
+  ok(E.canDrinkAle(), 'Bitkin olmadan içilir'); isOk(E.drinkAle());
+  eq(s.effects.map(e => e.kind).sort(), ['courage', 'drunk']);
+  ok(Math.abs(E.playerStats().dph / dph - 1.1) < 0.02, 'hasar +%10');
+  s.school = 'wolf'; ok(!E.canDrinkAle(), 'diğer okullar Bitkin değilken içemez');
 });
 test('Mahakam Ale: elle içilir, Bitkin gider, 24 saat Sarhoş: canavar vuruşları ×2', () => {
   const { E, s, go } = setup({ idle: true });
