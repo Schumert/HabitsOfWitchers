@@ -377,13 +377,17 @@ function renderHunt() {
   const status = ci.mode === 'recover' ? `<div class="cb-status recover">🩹 ${L(`Yenildin; ${sfx(hm(new Date(ci.until)), 'e')} kadar toparlanıyorsun, sonra tam canla ava dönersin.`, `You were defeated; recovering until ${hm(new Date(ci.until))}, then you return at full HP.`)}</div>`
     : c ? `<div class="cb-status fight">⚔ ${L('Avdasın; uygulama kapalıyken de devam eder. Canavar sana sadece görevlerinde başarısız olunca vurur.', 'Hunting; it continues while the app is closed. The monster only hits you when you fail a quest.')}</div>` : '';
   const wound = ci.wounded ? `<span class="effect exhausted" title="${L('Canın %50 altında', 'HP below 50%')}">🩸 ${L('Yaralı', 'Wounded')} −20%</span>` : '';
-  const effects = ci.effects.length || wound ? `<div class="cb-effects">${wound}${ci.effects.map(e => `<span class="effect ${e.kind}" title="${esc(e.src || '')}">${e.kind === 'tired' ? '😩 ' + L('Yorgun', 'Tired') + ` −${e.pct}%` : e.kind === 'focus' ? '🎯 ' + L('Odak', 'Focus') + ` +${e.pct}%` : e.kind === 'thunder' ? `⚡ Thunderbolt +${e.pct}%` : e.kind === 'blackblood' ? `🩸 Black Blood +${L('%' + e.pct, e.pct + '%')} ${L('kritik', 'crit')}` : e.kind === 'early' || e.kind === 'discipline' ? `✦ ${esc(DATA.UNIQUE_BY_ID[e.kind].name)} +${e.pct}%` : '🥀 ' + L('Bitkin', 'Exhausted') + ` −${e.pct}%`} · ${fmtDur(new Date(e.until) - now())}</span>`).join('')}
+  const effects = ci.effects.length || wound ? `<div class="cb-effects">${wound}${ci.effects.map(e => `<span class="effect ${e.kind}" title="${esc(e.src || '')}">${e.kind === 'tired' ? '😩 ' + L('Yorgun', 'Tired') + ` −${e.pct}%` : e.kind === 'focus' ? '🎯 ' + L('Odak', 'Focus') + ` +${e.pct}%` : e.kind === 'thunder' ? `⚡ Thunderbolt +${e.pct}%` : e.kind === 'drunk' ? `🍺 ${L('Sarhoş', 'Drunk')} · ${L('vuruşlar', 'hits')} ×${DATA.EFFECTS.drunk.hurt}` : e.kind === 'blackblood' ? `🩸 Black Blood +${L('%' + e.pct, e.pct + '%')} ${L('kritik', 'crit')}` : e.kind === 'early' || e.kind === 'discipline' ? `✦ ${esc(DATA.UNIQUE_BY_ID[e.kind].name)} +${e.pct}%` : '🥀 ' + L('Bitkin', 'Exhausted') + ` −${e.pct}%`} · ${fmtDur(new Date(e.until) - now())}</span>`).join('')}
       ${ci.deb ? `<small class="muted">${L(`Toplam hasar cezası −%${ci.deb}`, `Total damage penalty −${ci.deb}%`)}</small>` : ''}</div>` : '';
   const potions = `<div class="cb-potions">
       <span title="${L(`İçince +${ci.potionHeal} can. Can avda saatte %${+(ci.regen.fight * 100).toFixed(2)} dolar; yenilince saatte %${Math.round(ci.regen.idle * 100)} toparlanırsın.`, `Drinking gives +${ci.potionHeal} HP. HP regenerates ${+(ci.regen.fight * 100).toFixed(2)}%/h while hunting; after a defeat you recover ${Math.round(ci.regen.idle * 100)}%/h.`)}">🧪 Swallow <b>${ci.potions}/${ci.potionCap}</b></span>
       <button class="btn sm" data-act="drink" ${ci.potions < 1 || s.hp >= E.maxHp() ? 'disabled' : ''} title="+${ci.potionHeal} ${L('can', 'HP')}">🧪 ${L('İç', 'Drink')}</button>
       <button class="btn sm ghost" data-act="buy" data-id="swallow" ${ci.potions >= ci.potionCap || s.gold < ci.potionPrice ? 'disabled' : ''}>${L('Al', 'Buy')} · ${ci.potionPrice} 🪙</button>
-      <span title="${L('Kaçırılan bir günde kendiliğinden içilir: Bitkin olmazsın', 'Drunk automatically on a missed day: the monster can\'t strike and you don\'t become Exhausted')}">🍺 Mahakam Ale <b>${ci.honey}</b></span></div>
+      </div>
+    <div class="cb-potions">
+      <span title="${esc(DATA.SHOP.find(i => i.id === 'honey').desc)}">🍺 Mahakam Ale <b>${ci.honey}/${E.honeyMax()}</b></span>
+      <button class="btn sm" data-act="itemuse" data-id="honey" ${ci.honey < 1 || !ci.effects.some(e => e.kind === 'exhausted') ? 'disabled' : ''} title="${L('Bitkin geçer, 24 saat canavar vuruşları ×2', 'Ends Exhausted; monster hits ×2 for 24 hours')}">🍺 ${L('İç', 'Drink')}</button>
+      <button class="btn sm ghost" data-act="buy" data-id="honey" ${ci.honey >= E.honeyMax() || s.gold < E.shopItems().find(i => i.id === 'honey').price ? 'disabled' : ''}>${L('Al', 'Buy')} · ${E.shopItems().find(i => i.id === 'honey').price} 🪙</button></div>
     ${ci.thunders.map(t => `<div class="cb-potions">
       <span title="${L(`${DATA.THUNDER.hours} saat boyunca hasar +%${t.pct}. Üst üste binmez: yenisi eskisinin yerine geçer.`, `+${t.pct}% damage for ${DATA.THUNDER.hours} hours. Doesn't stack: a new one replaces the old.`)}">⚡ ${esc(t.name)} +${L('%' + t.pct, t.pct + '%')} <b>${t.n}/${ci.thunderCap}</b></span>
       <button class="btn sm" data-act="thunder" data-id="${t.id}" ${t.n < 1 ? 'disabled' : ''}>⚡ ${L('İç', 'Drink')}</button>
@@ -845,8 +849,8 @@ const itemCap = i => ({ swallow: DATA.POTION.cap, honey: E.honeyMax(), dancing: 
 function itemCard(i, mode) {
   const n = itemOwned(i), s = st();
   const foot = mode === 'shop'
-    ? (i.locked ? `<span class="muted">🔒 ${L(`Sv ${i.lv}`, `Lv ${i.lv}`)}</span>` : (i.id === 'mutagen' && !E.oddLeft().length) || (i.id === 'puzzle' && !E.puzzleLeft()) ? `<span class="muted">${L('Tükendi', 'Sold out')}</span>`
-      : `<span class="price ${s.gold < i.price ? 'short' : ''}">${i.price} 🪙</span>${i.id === 'puzzle' ? ` <small class="muted">${E.puzzleLeft()}/${DATA.PUZZLE.daily}</small>` : ''}`)
+    ? (i.locked ? `<span class="muted">🔒 ${L(`Sv ${i.lv}`, `Lv ${i.lv}`)}</span>` : (i.id === 'mutagen' && !E.oddLeft().length) || i.stock === 0 ? `<span class="muted">${L('Tükendi', 'Sold out')}</span>`
+      : `<span class="price ${s.gold < i.price ? 'short' : ''}">${i.price} 🪙</span>${i.stock != null ? ` <small class="muted" title="${L('Bugünkü stok', "Today's stock")}">${i.stock}/${i.stockMax}</small>` : ''}`)
     : `<span class="muted">${n}/${itemCap(i)}</span>`;
   return `<div class="item-card ${i.locked ? 'is-locked' : ''}" data-act="item" data-id="${i.id}" data-mode="${mode}" title="${esc(i.name)}">
     ${cardHtml({ a: i.art, n: i.name, r: i.r }, { noAct: true, locked: i.locked })}
@@ -958,7 +962,7 @@ function showItemDetail(id, mode) {
     else if (i.own === 'blackblood') btns = `<button class="btn" data-act="itemuse" data-id="blackblood" ${n < 1 ? 'disabled' : ''}>🩸 ${L('İç', 'Drink')}</button>`;
     else if (i.own?.startsWith('thunder')) btns = `<button class="btn" data-act="itemuse" data-id="${i.own}" ${n < 1 ? 'disabled' : ''}>⚡ ${L('İç', 'Drink')}</button>`;
     else if (i.own === 'dancing') btns = `<button class="btn" data-act="itemuse" data-id="dancing" ${n < 1 || !s.contract || ci.mode === 'recover' || ci.dancingWait > 0 ? 'disabled' : ''}>✴ ${ci.dancingWait > 0 ? `⏳ ${fmtDur(ci.dancingWait)}` : `${L('At', 'Throw')} · ${ci.dancingMin}–${ci.dancingMax}`}</button>`;
-    else if (i.own === 'honey') btns = `<span class="muted">${L('Kaçırılan bir günde kendiliğinden içilir.', 'Drunk automatically on a missed day.')}</span>`;
+    else if (i.own === 'honey') btns = `<button class="btn" data-act="itemuse" data-id="honey" ${n < 1 || !ci.effects.some(e => e.kind === 'exhausted') ? 'disabled' : ''}>🍺 ${L('İç', 'Drink')}</button>`;
   }
   openModal(`<div class="item-detail">
     ${cardHtml({ a: i.art, n: i.name, r: i.r }, { q: 'medium', noAct: true, locked: i.locked })}
@@ -1557,7 +1561,7 @@ function showRules() {
   <h3>Av (idle)</h3>
   <p>Karakterin kontrattaki canavarla sürekli dövüşür; uygulama kapalıyken de. Saatlik hasarın seviyenden, kılıçlarından, zincirlerinden ve kart bağlarından gelir. Canavar sana kendiliğinden vurmaz: bir görevi geciktirirsen yarım, kaçırırsan tam vurur (boss'lar daha sert). Can avdayken saatte yaklaşık %0,3 dolar (okula göre: Bear %0,5, Griffin %0,35, Wolf %0,3, Viper %0,25, Cat %0,2, Manticore %0,3); yenilip toparlanırken saatte %15 (Bear okulu %30). Kontrat hiç bitmez: istersen panodan başka bir kontrat seçersin (eskisinin ilerlemesi sıfırlanır), seçmezsen en kolay iş kendiliğinden alınır. Acil durumda Swallow içersin: en yüksek canının %50'sini doldurur. Thunderbolt 24 saat hasarı +%20 artırır (Gelişmiş +%30 13. seviyeden, Üstün +%40 25. seviyeden; üst üste binmez). Petri’s Philter alınınca TP verir (+10 / +20 / +35; günde en fazla bir tane). Dancing Star bombası canavara rastgele 3–10 saatlik hasarın kadar vurur; attıktan sonra 48 saat yenisini atamazsın. Canın %50'nin altındayken Yaralısın: hasarın −%20. Can sıfırlanırsa yenilirsin: canavarın canı tamamen dolar, orenin %10'unu kaybedersin ve canın dolana kadar toparlanırsın. Kartlar avdan değil alışkanlıklardan gelir.</p>
   <h3>Cezalar</h3>
-  <p>Gecikmek canavarın yarım vuruşu ve 12 saat "Yorgun" (hasar −%15), kaçırmak tam vuruş ve 24 saat "Bitkin" (−%30) demektir; cezalar birikir ama en çok −%60 olur. Mahakam Ale kaçırılan bir günde kendiliğinden içilir: Bitkin olmazsın. Griffin okulu ne Yorgun ne Bitkin olur.</p>
+  <p>Gecikmek canavarın yarım vuruşu ve 12 saat "Yorgun" (hasar −%15), kaçırmak tam vuruş ve 24 saat "Bitkin" (−%30) demektir; cezalar birikir ama en çok −%60 olur. Bitkinken Mahakam Ale içebilirsin: Bitkin geçer ama 24 saat sarhoş olursun, canavarın vuruşları ×2. Griffin okulu ne Yorgun ne Bitkin olur.</p>
   <h3>Zincir</h3>
   <ul>
    <li>Her başarılı gün bir halka: <b>Demir → Çelik (7) → Gümüş (14) → Altın (30) → Mithril (40) → Göktaşı (60)</b>. Her alışkanlığın kendi zinciri vardır.</li>
@@ -1589,7 +1593,7 @@ function showRulesEn() {
   <h3>The hunt (idle)</h3>
   <p>Your character fights the contract's monster continuously, even while the app is closed. Your damage per hour comes from your level, swords, chains and card links. Monsters don't hit you on their own: being late on a quest earns you half a hit, missing it a full hit (bosses hit harder). HP regenerates about 0.3% per hour while hunting (by school: Bear 0.5%, Griffin 0.35%, Wolf 0.3%, Viper 0.25%, Cat 0.2%, Manticore 0.3%); while recovering from a defeat, 15% per hour (Bear School 30%). The contract never ends: pick another one from a board if you like (the old one's progress resets), otherwise the easiest job is taken automatically. In an emergency, drink a Swallow: it heals 50% of your max HP. Thunderbolt raises damage by 20% for 24 hours (Enhanced +30% from level 13, Superior +40% from level 25; they don't stack). Petri’s Philter gives XP on purchase (+10 / +20 / +35; at most one a day). The Dancing Star bomb hits the monster for a random 3–10 hours of your damage; after a throw you must wait 48 hours for the next. Below 50% HP you are Wounded: −20% damage. If your HP hits zero you are defeated: the monster heals completely, you lose 10% of your crowns and recover until your HP is full. Cards come from habits, not from the hunt.</p>
   <h3>Penalties</h3>
-  <p>Being late means half a monster hit and 12 hours "Tired" (−15% damage); missing means a full hit and 24 hours "Exhausted" (−30%); penalties stack up to −60%. Mahakam Ale is drunk automatically on a missed day: you don't become Exhausted. The Griffin School never becomes Tired or Exhausted.</p>
+  <p>Being late means half a monster hit and 12 hours "Tired" (−15% damage); missing means a full hit and 24 hours "Exhausted" (−30%); penalties stack up to −60%. While Exhausted you can drink Mahakam Ale: Exhausted ends, but you're drunk for 24 hours and monster hits deal ×2. The Griffin School never becomes Tired or Exhausted.</p>
   <h3>Chain</h3>
   <ul>
    <li>Each successful day adds a link: <b>Iron → Steel (7) → Silver (14) → Gold (30) → Mithril (40) → Meteorite (60)</b>. Every habit has its own chain.</li>
@@ -1774,7 +1778,7 @@ document.addEventListener('click', async e => {
     case 'puzzleopen': showPuzzle(); break;
     case 'puzzleanswer': answerPuzzle(); break;
     case 'puzzledone': closeModal(); render(); showQueue(); break;
-    case 'itemuse': { const inModal = !!t.closest('#modalBox'); const r = id === 'swallow' ? E.drinkPotion() : id === 'dancing' ? E.throwDancing() : id === 'blackblood' ? E.drinkBlackBlood() : E.drinkThunder(id);
+    case 'itemuse': { const inModal = !!t.closest('#modalBox'); const r = id === 'swallow' ? E.drinkPotion() : id === 'dancing' ? E.throwDancing() : id === 'blackblood' ? E.drinkBlackBlood() : id === 'honey' ? E.drinkAle() : E.drinkThunder(id);
       if (!inModal) { act(r); break; }
       closeModal(); if (act(r) && !modalOpen() && (st()[id] || 0) > 0) showItemDetail(id, 'own'); break; }
     case 'buysword': { const w = swordById(id), p = w && E.shopPrice(w); if (w && confirm(L(`${w.name} (seviye ${st().level}) için ${p} oren harcansın mı?`, `Spend ${p} crowns on ${w.name} (level ${st().level})?`))) act(E.buySword(id)); break; }

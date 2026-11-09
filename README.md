@@ -55,10 +55,12 @@ Keep your habits and your witcher grows stronger, earns crowns and collects Gwen
 
 ![Merchant](docs/screenshots/merchant.jpg)
 
+The merchant restocks daily: 3 of each potion and bomb (Thunderbolt: 3 per grade), 1 Petri’s Philter, 5 Puzzle Boxes. You can carry at most 5 of each.
+
 | Item | Effect | Price |
 |---|---|---|
 | Swallow | Heals 50% of your max HP | 100 |
-| Mahakam Ale | Drunk automatically on a missed day: you don't become Exhausted | 60 |
+| Mahakam Ale | Drink it while Exhausted: Exhausted ends, but you're drunk for 24 h (monster hits ×2) | 40 |
 | Thunderbolt | +20% damage for 24 hours (Enhanced +30% from level 13: 300 · Superior +40% from level 25: 600). Doesn't stack | 120 |
 | Petri’s Philter | +10 XP, drunk on purchase (Enhanced +20 XP: 150 · Superior +35 XP: 350). One a day | 50 |
 | Dancing Star (bomb) | Hits the monster for 3–10 hours' worth of your damage; 48-hour cooldown between throws | 120 |
@@ -230,10 +232,12 @@ Alışkanlıklarını sürdürürsen witcher'ın güçlenir, oren kazanır ve Gw
 
 ![Tüccar](docs/screenshots/merchant.jpg)
 
+Tüccarın stoğu her gün yenilenir: her iksir ve bombadan 3 (Thunderbolt'ta kademe başına 3), 1 Petri’s Philter, 5 Puzzle Box. Her birinden üzerinde en fazla 5 tane taşıyabilirsin.
+
 | Eşya | Etkisi | Fiyat |
 |---|---|---|
 | Swallow | En yüksek canın %50'si | 100 |
-| Mahakam Ale | Kaçırılan bir günde kendiliğinden içilir: Bitkin olmazsın | 60 |
+| Mahakam Ale | Bitkinken içilir: Bitkin geçer ama 24 saat sarhoşsun (canavar vuruşları ×2) | 40 |
 | Thunderbolt | 24 saat hasar +%20 (Gelişmiş +%30, 13. seviyeden: 300 · Üstün +%40, 25. seviyeden: 600). Üst üste binmez | 120 |
 | Petri’s Philter | Alınınca hemen içilir: +10 TP (Gelişmiş +20 TP: 150 · Üstün +35 TP: 350). Günde bir tane | 50 |
 | Dancing Star (bomba) | Canavara 3–10 saatlik hasarın kadar vurur; iki atış arasında 48 saat bekleme | 120 |

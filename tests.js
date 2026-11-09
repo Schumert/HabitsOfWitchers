@@ -68,11 +68,11 @@ test('Yatış: aralıkta meditasyon sabahı ×1.5 ve +1 kart (toplam 3) yapar', 
   eq(day(s, '2026-11-06').reward.mult, 1.5);
   eq(E.ev.reveals[0].cards.length, D.CARDS_PER.first + D.CARDS_PER.prepBonus, 'kart');
 });
-test('Kaçırılan gün: zincir kırılır, canavar tam vurur; ilk seferde Mahakam Ale "Bitkin"i önler, ikincide 24 saat "Bitkin" (−%30); cezalar en çok −%60', () => {
+test('Kaçırılan gün: zincir kırılır, canavar tam vurur; Mahakam Ale kendiliğinden içilmez, 24 saat "Bitkin" (−%30); cezalar en çok −%60', () => {
   const { E, s, go } = setup();
   go('2026-11-06T09:31');
-  eq(day(s, '2026-11-06').result, 'fail'); eq(s.honey, 0, 'Mahakam Ale içildi'); eq(s.effects, []); eq(s.hp, 100 - E.failHit(true), 'Mahakam Ale vuruşu önlemez');
-  s.hp = 100;
+  eq(day(s, '2026-11-06').result, 'fail'); eq(s.honey, 1, 'Mahakam Ale kendiliğinden içilmez'); eq(s.effects.map(e => e.kind), ['exhausted']); eq(s.hp, 100 - E.failHit(true));
+  s.hp = 100; s.effects = [];
   go('2026-11-07T09:31');
   eq(s.effects.map(e => e.kind), ['exhausted']); eq(E.debuffPct(), 30); eq(s.hp, 100 - E.failHit(true), 'tam vuruş');
   const dph = E.playerStats().dph; s.effects = []; ok(E.playerStats().dph > dph * 1.4, 'ceza hasarı düşürür');
@@ -336,13 +336,13 @@ test('Kontrat tabelası: ucuz yenileme, aktif kontrat yerinde kalır, bedel ayn�
   go('2026-11-09T12:00'); eq(E.boardRerollCost(0), D.REROLL.boardBase, 'yeni hafta sıfırlanır');
   s.gold = 0; isErr(E.rerollBoard(0), 'para yok');
 });
-test('Tüccar: Mahakam Ale 60 oren (en çok 3); Swallow pahalı, fiyatı seviyeyle artar (en çok 10)', () => {
+test('Tüccar: Mahakam Ale 40 oren (en çok 5); Swallow pahalı, en çok 5', () => {
   const { E, s } = setup();
-  eq(E.shopItems().find(i => i.id === 'honey').price, 60);
+  eq(E.shopItems().find(i => i.id === 'honey').price, 40);
   eq(E.shopItems().find(i => i.id === 'swallow').price, D.SHOP.find(i => i.id === 'swallow').price);
   ok(D.SHOP.find(i => i.id === 'swallow').price >= 40, 'zamlı');
-  s.gold = 10000; s.swallow = 9; isOk(E.buy('swallow')); isErr(E.buy('swallow'), 'kapasite');
-  s.honey = 3; isErr(E.buy('honey'), 'en çok 3');
+  s.gold = 10000; s.swallow = D.POTION.cap - 1; isOk(E.buy('swallow')); isErr(E.buy('swallow'), 'kapasite');
+  s.honey = 5; isErr(E.buy('honey'), 'en çok 5');
 });
 test('Tabela: kontrat seçilir, canı ve ödülü canavara özel', () => {
   const { E, s } = setup();
@@ -490,7 +490,7 @@ test('Petri’s Philter: üç kademe, günde en fazla bir tane', () => {
   const { E, s, go } = setup({ idle: true });
   s.gold = 1000; const xp = s.xp;
   isOk(E.buy('owl')); eq(s.gold, 950); eq(s.xp, xp + 10);
-  isErr(E.buy('owl'), 'günde bir'); ok(E.shopItems().find(i => i.id === 'owl').disabled);
+  isErr(E.buy('owl'), 'günlük stok 1'); ok(E.shopItems().find(i => i.id === 'owl').disabled);
   go('2026-11-06T22:00'); s.level = 25; const x2 = s.xp; isOk(E.buy('owl3')); eq(s.xp, x2 + 35); isErr(E.buy('owl2'), 'kademe fark etmez');
   s.level = 4; s.xp = 10000;
   ok(E.shopItems().find(i => i.id === 'owl').disabled, 'seviye sınırında TP doluyken alınmaz');
@@ -559,11 +559,21 @@ test('Mysterious Puzzle Box: bekleyen bilmece varken alınmaz; kelime eşleşmes
 });
 test('Mysterious Puzzle Box: günde 5 stok, ertesi gün yenilenir', () => {
   const { E, s, go } = setup({ idle: true }); s.gold = 10000;
-  eq(D.PUZZLE.daily, 5); eq(E.puzzleLeft(), 5);
+  eq(D.STOCK.puzzle, 5); eq(E.stockLeft('puzzle'), 5);
   for (let i = 0; i < 5; i++) { isOk(E.buy('puzzle'), 'kutu ' + (i + 1)); E.answerPuzzle('zzzz'); }
-  eq(E.puzzleLeft(), 0); ok(E.shopItems().find(i => i.id === 'puzzle').disabled, 'stok bitti');
+  eq(E.stockLeft('puzzle'), 0); ok(E.shopItems().find(i => i.id === 'puzzle').disabled, 'stok bitti');
   isErr(E.buy('puzzle'), '6. kutu alınmaz');
-  go('2026-11-06T09:00'); eq(E.puzzleLeft(), 5, 'ertesi gün yenilenir'); isOk(E.buy('puzzle'));
+  go('2026-11-06T09:00'); eq(E.stockLeft('puzzle'), 5, 'ertesi gün yenilenir'); isOk(E.buy('puzzle'));
+});
+test('Tüccar günlük stok: iksir ve bombalardan 3, Philter 1 (kademeler ortak); taşıma sınırı 5', () => {
+  const { E, s, go } = setup({ idle: true }); s.gold = 100000; s.level = 30; s.swallow = 0; s.honey = 0;
+  eq([D.POTION.cap, D.THUNDER.cap, D.BLACKBLOOD.cap, D.DANCING.cap, E.honeyMax()], [5, 5, 5, 5, 5], 'taşıma sınırları (stoktan ayrı)');
+  for (let i = 0; i < 3; i++) { isOk(E.buy('swallow')); s.swallow = 0; }
+  eq(E.stockLeft('swallow'), 0); isErr(E.buy('swallow'), 'stok bitti (taşıma sınırı değil)');
+  isOk(E.buy('thunder')); eq(E.stockLeft('thunder'), 2); eq(E.stockLeft('thunder2'), 3, 'Thunderbolt kademeleri ayrı stok');
+  isOk(E.buy('owl2')); eq(E.stockLeft('owl'), 0); eq(E.stockLeft('owl3'), 0, 'Philter kademeleri ortak stok');
+  eq(E.stockLeft('keg'), null, 'fıçının stoğu yok');
+  go('2026-11-06T10:00'); eq([E.stockLeft('swallow'), E.stockLeft('owl')], [3, 1], 'ertesi gün yenilenir');
 });
 test('Kart ödülleri açılmadan da verilir: fıçı ve kutu kartları hemen koleksiyona girer', () => {
   const { E, s } = setup({ idle: true });
@@ -652,7 +662,7 @@ test('Manticore: iksirler yarı fiyatına, bombalar değil; başlangıç donanı
   const { E, s } = setup({ school: 'manticore' });
   const price = id => E.shopItems().find(i => i.id === id).price;
   eq([price('swallow'), price('honey'), price('thunder'), price('thunder3'), price('owl'), price('owl2'), price('dancing')],
-    [D.SHOP.find(i => i.id === 'swallow').price / 2, 30, 60, 300, 25, 75, D.DANCING.price]);
+    [D.SHOP.find(i => i.id === 'swallow').price / 2, 20, 60, 300, 25, 75, D.DANCING.price]);
   eq(E.combatInfo().dancingPrice, D.DANCING.price, 'savaş panelinde de indirimsiz');
   eq(price('keg'), 60, 'kart fıçısı indirimsiz');
   eq(E.combatInfo().potionPrice, D.SHOP.find(i => i.id === 'swallow').price / 2);
@@ -966,13 +976,23 @@ test('Sonradan işleme: kaçırılan gün 24 saat içinde girilir; zincir ve cez
   eq(s.quest.progress, progBefore + 1);
   eq(E.correctableDay(), null, 'ikinci kez düzeltilemez');
 });
-test('Sonradan işleme: aralık sonrası saat gecikme sayılır; Mahakam Ale iade edilir', () => {
+test('Sonradan işleme: aralık sonrası saat gecikme sayılır; Bitkin kalkar', () => {
   const { E, s, go } = setup();
   succeed(E, go, '2026-11-06', 1);
-  eq(s.honey, 1);
-  go('2026-11-07T09:31'); eq(s.honey, 0, 'Mahakam Ale içildi');
+  go('2026-11-07T09:31'); ok(s.effects.some(e => e.kind === 'exhausted'));
   go('2026-11-07T12:00'); isOk(E.correctMissed('2026-11-07', { wake: '09:00' }));
-  eq(s.days['2026-11-07'].result, 'late'); eq(s.honey, 1, 'Mahakam Ale iade'); eq(s.chain.rust, true);
+  eq(s.days['2026-11-07'].result, 'late'); ok(!s.effects.some(e => e.kind === 'exhausted'), 'Bitkin geri alındı'); eq(s.chain.rust, true);
+});
+test('Mahakam Ale: elle içilir, Bitkin gider, 24 saat Sarhoş: canavar vuruşları ×2', () => {
+  const { E, s, go } = setup({ idle: true });
+  isErr(E.drinkAle(), 'Bitkin değilken içilmez');
+  go('2026-11-06T09:31'); ok(s.effects.some(e => e.kind === 'exhausted'));
+  eq(s.honey, 1); isOk(E.drinkAle()); eq(s.honey, 0);
+  eq(s.effects.map(e => e.kind), ['drunk']); eq(E.debuffPct(), 0, 'hasar cezası yok');
+  const drunkHit = E.failHit(true), saved = s.effects; s.effects = []; const sober = E.failHit(true); s.effects = saved;
+  ok(Math.abs(drunkHit - sober * 2) <= 1, `vuruş ×2: ${drunkHit} / ${sober}`);
+  isErr(E.drinkAle(), 'Ale kalmadı');
+  go('2026-11-07T10:00'); ok(!s.effects.some(e => e.kind === 'drunk' && new Date(e.until) > new Date('2026-11-07T10:00')), '24 saat sonra biter');
 });
 test('Sonradan işleme: 24 saat geçince ya da sonraki gün işlenince olmaz', () => {
   const { E, s, go } = setup();
@@ -1059,7 +1079,7 @@ test('Veri: 8 kademe, Toussaint tek başına en üstte; her bölgede boss + 10�
 /* ---- simülasyon: kart, oren, seviye hızı, öldürme süreleri (yükseltmeli / yükseltmesiz) ---- */
 /* yükseltmeli oyuncu: her gün demirciden elindekinden iyi kılıcı alır, kuşandığını güçlendirir, 5 uygun kart birikince bağ kurar */
 function potionUp(E, s) {
-  while (s.swallow < 5 && s.gold >= E.shopItems().find(i => i.id === 'swallow').price) E.buy('swallow');   // iksir stoğu (gerçekçi oyuncu)
+  while (s.swallow < D.POTION.cap && E.buy('swallow').ok) {}   // iksir stoğu (gerçekçi oyuncu)
   while (s.hp < E.maxHp() * 0.5 && s.swallow > 0 && E.drinkPotion().ok) {}                                    // canı yarının altındaysa iksir içer
 }
 function gearUp(E, s) {
