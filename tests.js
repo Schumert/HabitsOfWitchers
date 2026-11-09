@@ -533,9 +533,9 @@ test('Black Blood: 24 saat kritik +%10, Vampir/Nekrofaj +%15 daha; hasarı deği
 });
 test('Mysterious Puzzle Box: bekleyen bilmece varken alınmaz; kelime eşleşmesi, ödül uygulanır', () => {
   const { E, s, go } = setup({ idle: true });
-  eq(D.SHOP.find(i => i.id === 'puzzle').price, 50);
+  eq(D.SHOP.find(i => i.id === 'puzzle').price, 100);
   eq(D.puzzleWords("Geralt of Rivia"), ['geralt', 'rivia']); eq(D.puzzleWords('Dol Blathanna Archer!'), ['dol', 'blathanna', 'archer']);
-  s.gold = 1000; isOk(E.buy('puzzle')); eq(s.gold, 950);
+  s.gold = 1000; isOk(E.buy('puzzle')); eq(s.gold, 900);
   const q = E.puzzleQuestion(); ok(q && D.CARD_BY_ART[q.a], 'soru var'); ok(['art', 'flavor'].includes(q.kind));
   isErr(E.buy('puzzle'), 'cevaplanmamış kutu varken alınmaz');
   const name = D.CARD_BY_ART[q.a].n, word = D.puzzleWords(name)[0];

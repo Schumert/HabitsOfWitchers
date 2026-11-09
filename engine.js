@@ -455,7 +455,7 @@ const ODDITIES = [
 ].map(o => bi(o, {}));
 const ODDITY_BY = Object.fromEntries(ODDITIES.map(o => [o.id, o]));
 /* Mysterious Puzzle Box: bilmeceyi bilince kasa açılır. Ödül kademeleri: kötüden iyiye olasılık azalır; aynı kademedekiler eşit şanslı. */
-const PUZZLE = { price: 50, secs: 30, grace: 2, tiers: [   // secs: cevap süresi (grace: ağ/tıklama payı)
+const PUZZLE = { price: 100, secs: 30, grace: 2, tiers: [   // secs: cevap süresi (grace: ağ/tıklama payı)
   { w: 16, wCat: 12.5, prizes: [{ id: 'keg' }, { id: 'gold', n: 100 }, { id: 'scraps', n: 40 }] },   // normalde kademe toplamı aynı kaldı (%48); Cat'te de tek ödül şansı kötüden iyiye azalır
   { w: 10, wCat: 12, prizes: [{ id: 'gold', n: 200 }, { id: 'bigkeg' }, { id: 'scraps', n: 100 }] },   // 1 kırıntı ≈ 2 oren
   { w: 8, wCat: 11, prizes: [{ id: 'gold', n: 500 }, { id: 'scraps', n: 250 }] },
