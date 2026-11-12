@@ -617,6 +617,7 @@ img.broken { opacity: 0; }
 .effect { font-size: .8rem; padding: 2px 8px; border-radius: 10px; border: 1px solid #6b2f26; color: #e2a79c; background: #22120f; }
 .effect.tired { border-color: #6b5a26; color: #e2cf9c; background: #221d0f; }
 .cb-potions { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: .88rem; margin: 6px 0; }
+.cb-potions .pot-grade { max-width: 100%; font-size: .82rem; padding: 2px 4px; }
 .cb-queue { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .85rem; margin: 6px 0; }
 .q-item { border: 1px solid var(--line, #2c2920); border-radius: 12px; padding: 1px 2px 1px 8px; }
 .q-item .btn { padding: 0 6px; }

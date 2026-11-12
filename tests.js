@@ -100,7 +100,7 @@ test('Savaş: canavar avda vurmaz; can avda okula göre dolar (Wolf saatte %0,3)
   ok(Math.abs(s.hp - (40 + E.maxHp() * 0.03)) < 0.01, 'Wolf saatte %0,3: ' + s.hp); eq(D.REGEN.fight.bear, 0.005); ok(D.REGEN.fight.cat < D.REGEN.fight.wolf); eq(s.swallow, 2, 'iksir kendiliğinden içilmez');
   s.hp = 60; ok(Math.abs(E.playerStats().dph - full / 0.8) < 0.01, 'yaralı değilken tam hasar');
   s.hp = 40;
-  isOk(E.drinkPotion()); eq(s.hp, Math.min(E.maxHp(), 40 + Math.round(E.maxHp() * D.POTION.heal))); eq(s.swallow, 1);
+  isOk(E.drinkPotion()); eq(s.hp, 40, 'Swallow anında doldurmaz'); eq(s.swallow, 1); ok(s.effects.some(e => e.kind === 'swallow'));
   s.hp = E.maxHp(); isErr(E.drinkPotion(), 'can dolu');
 });
 test('Savaş: başarısızlıkta canın biterse yenilirsin; canavarın canı tamamen dolar, 6 saat sonra tam canla dönersin', () => {
@@ -427,7 +427,7 @@ test('Son oyun: son seviyede TP Ün (★) kazandırır; ün oren ve Swallow veri
   const g = s.gold;
   E.dev.addXp(E.fameNeed() * 2 + 5);
   eq(s.level, D.MAX_LEVEL); eq(s.fame, 2); ok(s.xp < E.fameNeed());
-  ok(s.gold > g, 'ün oreni'); eq(s.swallow, 2, 'ün Swallow');
+  ok(s.gold > g, 'ün oreni'); eq(s.swallow3, 2, 'ün Swallow (seviyene uygun Üstün)');
 });
 test('Son oyun: efsane olmadan elit yok, kesilen canavar tekrar alınamaz', () => {
   const { E, s } = setup();
@@ -463,10 +463,39 @@ test('Kontrat değiştirme: iptal yok, başka kontrat alınca eskisinin ilerleme
   isOk(E.takeContract(a)); eq(s.contract.hp, s.contract.max, 'eskisine dönünce ilerleme sıfır');
   const old = migrate({ ...JSON.parse(JSON.stringify(s)), huntPaused: true }); eq(old.huntPaused, undefined, 'eski kayıttaki duraklatma silinir');
 });
-test('Swallow: 100 oren, en yüksek canın %50si (Swallow Ustası %80)', () => {
-  eq(D.SHOP.find(i => i.id === 'swallow').price, 100); eq(D.POTION.heal, 0.5); eq(D.POTION.master, 0.8);
-  const { E, s } = setup({ idle: true });
-  s.level = 30; s.hp = 1; s.swallow = 1; isOk(E.drinkPotion()); eq(s.hp, 1 + Math.round(E.maxHp() * 0.5), '30. seviyede de canın yarısı');
+test('Swallow: 12 saatte toplam +50/+120/+200 can (pasif iyileşme), üst üste binmez; kademeler tek cebi paylaşır', () => {
+  const [g1, g2, g3] = D.POTION.grades;
+  eq([g1.heal, g2.heal, g3.heal], [50, 120, 200]); eq([g1.price, g2.price, g3.price], [40, 120, 250]); eq([g2.lv, g3.lv], [13, 25]); eq(D.POTION.hours, 12);
+  const { E, s, go } = setup({ idle: true });
+  go('2026-11-05T22:00'); ok(s.contract); s.contract.hp = s.contract.max = 1e9;
+  s.level = 30; s.hp = 100; s.swallow = 1; s.swallow3 = 1;
+  const regen = E.maxHp() * D.REGEN.fight.wolf;   // saatlik pasif iyileşme
+  isOk(E.drinkPotion('swallow')); eq(s.hp, 100, 'anında doldurmaz'); eq([s.swallow, s.swallow3], [0, 1]);
+  const fx = s.effects.find(e => e.kind === 'swallow'); ok(Math.abs(fx.rate - 50 / 12) < 1e-9, 'saatte 50/12');
+  eq(E.buffPct(), 0, 'hasar bonusu değil');
+  go('2026-11-06T04:00'); ok(Math.abs(s.hp - (100 + 6 * regen + 25)) < 0.01, '6 saatte +25: ' + s.hp);
+  const ctl = setup({ idle: true }); ctl.go('2026-11-05T22:00'); ctl.s.contract.hp = ctl.s.contract.max = 1e9; ctl.s.level = 30; ctl.s.hp = 100;   // iksirsiz kopya (sabah kaçırılan görevin vuruşu ikisinde de aynı)
+  go('2026-11-06T16:00'); ctl.go('2026-11-06T16:00'); ok(Math.abs(s.hp - ctl.s.hp - 50) < 0.01, '12 saatte toplam +50: ' + (s.hp - ctl.s.hp));
+  ok(!s.effects.some(e => e.kind === 'swallow'), 'süre bitince kalkar');
+  const h0 = s.hp; isOk(E.drinkPotion()); eq(s.swallow3, 0, 'seçilmezse en güçlüsü');
+  const c0 = ctl.s.hp; go('2026-11-06T22:00'); ctl.go('2026-11-06T22:00'); ok(Math.abs((s.hp - h0) - (ctl.s.hp - c0) - 100) < 0.01, 'Üstün: 6 saatte +100');
+  s.swallow2 = 1; s.level = 30; isOk(E.drinkPotion('swallow2')); eq(s.effects.filter(e => e.kind === 'swallow').length, 1, 'üst üste binmez');
+  const fx2 = s.effects.find(e => e.kind === 'swallow'); eq(fx2.n, 2, 'etki sürerken 2. iksir');
+  ok(Math.abs(fx2.rate - 120 / 11) < 1e-9, 'yenisi eskisinin yerine geçer, 11 saatte'); eq(new Date(fx2.until) - new Date(fx2.from), 11 * 36e5);
+  for (let i = 3; i <= 5; i++) { s.swallow = 1; s.hp = 100; isOk(E.drinkPotion('swallow')); }
+  const fx5 = s.effects.find(e => e.kind === 'swallow'); eq([fx5.n, (new Date(fx5.until) - new Date(fx5.from)) / 36e5], [5, 8], '5. iksir 8 saat');
+  eq(E.combatInfo().swallowNext, 7, 'sıradaki 7 saat');
+  go('2026-11-07T07:00'); eq(E.combatInfo().swallowNext, 12, 'etki bitince yine 12 saat');
+  isErr(E.drinkPotion('swallow3'), 'kademe yok');
+  s.gold = 10000; s.swallow = 3; s.swallow2 = 2; eq(E.potCount('swallow'), 5); isErr(E.buy('swallow3'), 'ortak cep dolu'); isErr(E.buy('swallow'), 'ortak cep dolu');
+  s.swallow = 2; isOk(E.buy('swallow3')); eq(E.potCount('swallow'), 5);
+  s.level = 5; ok(E.shopItems().find(i => i.id === 'swallow2').locked, 'Gelişmiş 13. seviyede açılır');
+  eq(E.potionHeal('swallow'), 50);
+  const m = setup({ idle: true, school: 'manticore' }); eq(m.E.potionHeal('swallow2'), Math.round(120 * 1.3), 'Manticore ×1,3');
+});
+test('Seviye atlayınca seviyene uygun en güçlü Swallow verilir', () => {
+  const { E, s } = setup(); s.region = D.BAND_COUNT - 1; s.legend = true; s.level = 12; s.xp = 0; s.swallow = 0; s.swallow2 = 0;
+  E.dev.addXp(E.xpNeed(12)); eq(s.level, 13); eq([s.swallow, s.swallow2], [0, 1]);
 });
 test('Thunderbolt: üç kademe, 24 saat, Odak ile toplanır, üst üste binmez', () => {
   const { E, s, go } = setup({ idle: true });
@@ -483,7 +512,9 @@ test('Thunderbolt: üç kademe, 24 saat, Odak ile toplanır, üst üste binmez',
   s.effects.push({ id: 'f', kind: 'focus', pct: 10, until: '2026-12-01T00:00:00' }); eq(E.buffPct(), 50, 'Odak + Thunderbolt');
   go('2026-11-06T09:30'); eq(E.buffPct(), 50, '12 saat sonra hâlâ sürer');
   go('2026-11-06T21:31'); eq(E.buffPct(), 10, '24 saat sonra biter');
+  eq(setup({ school: 'manticore' }).E.thunderPct('thunder2'), 39, 'Manticore ×1,3');
   s.thunder = D.THUNDER.cap; isErr(E.buy('thunder'), 'kapasite');
+  s.thunder = 3; s.thunder3 = 2; isErr(E.buy('thunder'), 'kademeler ortak cep'); s.thunder3 = 0;
   s.level = 13; s.gold = 1000; isOk(E.buy('thunder2')); eq(s.thunder2, 1);
 });
 test('Petri’s Philter: üç kademe, günde en fazla bir tane', () => {
@@ -495,27 +526,33 @@ test('Petri’s Philter: üç kademe, günde en fazla bir tane', () => {
   s.level = 4; s.xp = 10000;
   ok(E.shopItems().find(i => i.id === 'owl').disabled, 'seviye sınırında TP doluyken alınmaz');
 });
-test('Dancing Star: rastgele 3–10 saatlik hasar, can bedeli yok, 48 saat bekleme; Manticore ×1,3', () => {
-  const { E, s, go } = setup({ idle: true });
-  go('2026-11-05T22:00'); ok(s.contract);
-  s.contract.hp = s.contract.max = 100000;
-  isErr(E.throwDancing(), 'bomba yok');
-  s.dancing = 2; s.hp = E.maxHp();
-  const dph = E.playerStats().dph, hp0 = s.contract.hp, crit = s.stats.crits;
-  isOk(E.throwDancing()); eq(s.dancing, 1); eq(s.hp, E.maxHp(), 'can gitmez');
-  const hit = (hp0 - s.contract.hp) / (s.stats.crits > crit ? D.CRIT_MULT : 1), hrs = hit / Math.round(dph);
-  ok(hrs >= 2.99 && hrs <= 10.01 && Math.abs(hrs - Math.round(hrs)) < 0.02, '3–10 saatlik hasar: ' + hrs);
-  isErr(E.throwDancing(), 'bekleme süresi'); eq(s.dancing, 1); ok(E.combatInfo().dancingWait > 0);
-  go('2026-11-07T21:00'); isErr(E.throwDancing(), '47 saat yetmez');
-  go('2026-11-07T22:01'); isOk(E.throwDancing(), '48 saat sonra atılır'); eq(s.dancing, 0);
+test('Dancing Star: kademeye göre saatlik hasar, bekleme yok, aynı canavarda her bomba %30 az; Manticore ×1,3', () => {
+  const { E, s } = setup({ idle: true });
+  eq(D.DANCING.grades.map(g => [g.minH, g.maxH, g.price, g.lv]), [[2, 4, 120, 1], [4, 7, 300, 13], [7, 12, 600, 25]]);
   eq(D.UNIQUE_BY_ID.alchhand.id, 'alchhand'); eq(D.UNIQUE_BY_ID.fireproof, undefined);
-  for (const [school, r, h, k] of [['wolf', 0, 3, 1], ['wolf', 0.999, 10, 1], ['manticore', 0.999, 10, 1.3]]) {   // kritik yok (çelik yok/zar yüksek)
+  for (const [school, r, id, h, k] of [['wolf', 0, 'dancing', 2, 1], ['wolf', 0.9999, 'dancing', 4, 1], ['wolf', 0.9999, 'dancing3', 12, 1], ['manticore', 0.9999, 'dancing2', 7, 1.3]]) {   // kritik yok (çelik yok/zar yüksek)
     const m = setup({ idle: true, school, random: () => r });
-    m.go('2026-11-05T22:00'); m.s.contract.hp = m.s.contract.max = 1e7; m.s.hp = m.E.maxHp(); m.s.swords.steel = null; m.s.dancing = 1;
-    const one = Math.round(m.E.playerStats().dph * k);
-    eq(m.E.combatInfo().dancingMin, one * 3); eq(m.E.combatInfo().dancingMax, one * 10);
-    isOk(m.E.throwDancing()); eq(1e7 - m.s.contract.hp, one * h, `${school} ${h} saat`);
+    m.go('2026-11-05T22:00'); m.s.contract.hp = m.s.contract.max = 1e7; m.s.hp = m.E.maxHp(); m.s.swords.steel = null; m.s[id] = 1;
+    const one = m.E.playerStats().dph * k;
+    isOk(m.E.throwDancing(id)); eq(1e7 - m.s.contract.hp, Math.round(one * h), `${school} ${id} ${h} saat`); eq(m.s[id], 0);
   }
+  const m = setup({ idle: true, random: () => 0.9999 });
+  m.go('2026-11-05T22:00'); ok(m.s.contract); m.s.contract.hp = m.s.contract.max = 1e7; m.s.hp = m.E.maxHp(); m.s.swords.steel = null;
+  isErr(m.E.throwDancing(), 'bomba yok');
+  m.s.dancing = 3; const one = m.E.playerStats().dph, hits = [];
+  for (let i = 0; i < 3; i++) { const h0 = m.s.contract.hp; isOk(m.E.throwDancing(), 'bekleme yok'); hits.push(h0 - m.s.contract.hp); }
+  eq(hits, [Math.round(one * 4), Math.round(one * 4 * 0.7), Math.round(one * 4 * 0.49)], 'her bomba %30 az');
+  eq(m.s.hp, m.E.maxHp(), 'can gitmez'); ok(Math.abs(m.E.combatInfo().dancingFade - 0.343) < 1e-9);
+  m.s.contract.bombs = 0; eq(m.E.combatInfo().dancingFade, 1, 'yeni kontratta sıfır');
+  s.dancing = 3; s.dancing2 = 2; s.gold = 10000; isErr(E.buy('dancing'), 'kademeler ortak cep');
+});
+test('Saat geri alınınca av durmaz: savaş saati şimdiye çekilir', () => {
+  const { E, s, go } = setup({ idle: true });
+  go('2026-11-05T22:00'); ok(s.contract); s.contract.hp = s.contract.max = 1e9;
+  go('2026-11-10T22:00'); const hp1 = s.contract.hp; ok(hp1 < 1e9, 'ileride vurdu');
+  go('2026-11-06T10:00'); E.advanceCombat(); eq(s.combat.t, new Date('2026-11-06T10:00').toISOString(), 'savaş saati geri çekildi');
+  ok(Object.values(s.combat.last || {}).every(x => new Date(x) <= new Date('2026-11-06T10:00')), 'gelecekteki günlük izleri silinir');
+  go('2026-11-06T12:00'); E.advanceCombat(); ok(s.contract.hp < hp1, 'geri alınan saatten sonra yine vurur');
 });
 test('Black Blood: 24 saat kritik +%10, Vampir/Nekrofaj +%15 daha; hasarı değil kritiği artırır', () => {
   const { E, s, go } = setup({ idle: true });
@@ -666,9 +703,10 @@ test('Wolf: yan görev 3 kırıntı (günde ilk 5); diğer okullar vermez', () =
   const o = setup({ idle: true }); o.s.school = 'bear'; o.E.addSide('yan', 5, 0); const b0 = o.s.scraps;
   isOk(o.E.completeSide(o.s.quests[0].id)); eq(o.s.scraps, b0);
 });
-test('Manticore: iksirlerden 3 fazla taşır (Swallow, Thunderbolt, Black Blood), Ale ve bomba hariç', () => {
+test('Manticore: iksir ve bombalardan 3 fazla taşır (Swallow, Thunderbolt, Black Blood, Dancing Star), Ale hariç', () => {
   const { E, s } = setup({ idle: true }); s.school = 'manticore';
-  eq([E.swallowCap(), E.thunderCap(), E.bbCap(), E.honeyMax()], [D.POTION.cap + 3, D.THUNDER.cap + 3, D.BLACKBLOOD.cap + 3, 5]);
+  eq([E.swallowCap(), E.thunderCap(), E.bbCap(), E.dancingCap(), E.honeyMax()], [D.POTION.cap + 3, D.THUNDER.cap + 3, D.BLACKBLOOD.cap + 3, D.DANCING.cap + 3, 5]);
+  s.gold = 10000; s.dancing = D.DANCING.cap; isOk(E.buy('dancing'), 'bombada da 5in üstüne alınır');
   s.gold = 10000; s.swallow = D.POTION.cap; isOk(E.buy('swallow'), '5in üstüne alınır');
   s.school = 'wolf'; eq(E.swallowCap(), D.POTION.cap);
 });
@@ -1003,7 +1041,9 @@ test('Mahakam Ale (Griffin): her zaman içilir, 24 saat hasar +%10 ve Sarhoş', 
   ok(E.canDrinkAle(), 'Bitkin olmadan içilir'); isOk(E.drinkAle());
   eq(s.effects.map(e => e.kind).sort(), ['courage', 'drunk']);
   ok(Math.abs(E.playerStats().dph / dph - 1.1) < 0.02, 'hasar +%10');
-  s.school = 'wolf'; ok(!E.canDrinkAle(), 'diğer okullar Bitkin değilken içemez');
+  s.school = 'wolf'; ok(!E.canDrinkAle(), 'diğer okullar Yorgun/Bitkin değilken içemez');
+  s.effects = [{ id: 't', kind: 'tired', pct: 15, until: '2026-12-01T00:00:00' }]; ok(E.canDrinkAle(), 'Yorgunken içilir'); s.honey = 1;
+  isOk(E.drinkAle()); ok(!s.effects.some(e => e.kind === 'tired'), 'Yorgun geçer'); ok(s.effects.some(e => e.kind === 'drunk'));
 });
 test('Mahakam Ale: elle içilir, Bitkin gider, 24 saat Sarhoş: canavar vuruşları ×2', () => {
   const { E, s, go } = setup({ idle: true });
@@ -1102,7 +1142,7 @@ test('Veri: 8 kademe, Toussaint tek başına en üstte; her bölgede boss + 10�
 /* yükseltmeli oyuncu: her gün demirciden elindekinden iyi kılıcı alır, kuşandığını güçlendirir, 5 uygun kart birikince bağ kurar */
 function potionUp(E, s) {
   while (s.swallow < D.POTION.cap && E.buy('swallow').ok) {}   // iksir stoğu (gerçekçi oyuncu)
-  while (s.hp < E.maxHp() * 0.5 && s.swallow > 0 && E.drinkPotion().ok) {}                                    // canı yarının altındaysa iksir içer
+  if (s.hp < E.maxHp() * 0.5 && s.swallow > 0 && !s.effects.some(e => e.kind === 'swallow' && e.rate)) E.drinkPotion();   // canı yarının altındaysa (etkide değilse) iksir içer
 }
 function gearUp(E, s) {
   const main = type => s.swords.owned.map(D.swordById).filter(w => w.type === type).sort((a, b) => E.swordValue(b) - E.swordValue(a))[0];

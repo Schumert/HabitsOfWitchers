@@ -210,7 +210,7 @@ function renderTop() {
   $('#chainLen').textContent = best.chain.len;
   $('#chainLen').style.color = tier.color;
   $('#chainStat').title = s.habits.map(h => `${h.name}: ${h.chain.len} ${L('halka', 'links')} (${TIERS[tierOf(h.chain.len)].name})`).join('\n');
-  $('#swallow').textContent = `${s.swallow}/${E.swallowCap()}`;
+  $('#swallow').textContent = `${E.potCount('swallow')}/${E.swallowCap()}`;
 }
 
 /* ---------- ana sayfa: bugünün alışkanlıkları ---------- */
@@ -377,29 +377,19 @@ function renderHunt() {
   const status = ci.mode === 'recover' ? `<div class="cb-status recover">🩹 ${L(`Yenildin; ${sfx(hm(new Date(ci.until)), 'e')} kadar toparlanıyorsun, sonra tam canla ava dönersin.`, `You were defeated; recovering until ${hm(new Date(ci.until))}, then you return at full HP.`)}</div>`
     : c ? `<div class="cb-status fight">⚔ ${L('Avdasın; uygulama kapalıyken de devam eder. Canavar sana sadece görevlerinde başarısız olunca vurur.', 'Hunting; it continues while the app is closed. The monster only hits you when you fail a quest.')}</div>` : '';
   const wound = ci.wounded ? `<span class="effect exhausted" title="${L('Canın %50 altında', 'HP below 50%')}">🩸 ${L('Yaralı', 'Wounded')} −20%</span>` : '';
-  const effects = ci.effects.length || wound ? `<div class="cb-effects">${wound}${ci.effects.map(e => `<span class="effect ${e.kind}" title="${esc(e.src || '')}">${e.kind === 'tired' ? '😩 ' + L('Yorgun', 'Tired') + ` −${e.pct}%` : e.kind === 'focus' ? '🎯 ' + L('Odak', 'Focus') + ` +${e.pct}%` : e.kind === 'thunder' ? `⚡ Thunderbolt +${e.pct}%` : e.kind === 'courage' ? `🍺 ${L('Cesaret', 'Courage')} +${L('%' + e.pct, e.pct + '%')}` : e.kind === 'drunk' ? `🍺 ${L('Sarhoş', 'Drunk')} · ${L('vuruşlar', 'hits')} ×${DATA.EFFECTS.drunk.hurt}` : e.kind === 'blackblood' ? `🩸 Black Blood +${L('%' + e.pct, e.pct + '%')} ${L('kritik', 'crit')}` : e.kind === 'early' || e.kind === 'discipline' ? `✦ ${esc(DATA.UNIQUE_BY_ID[e.kind].name)} +${e.pct}%` : '🥀 ' + L('Bitkin', 'Exhausted') + ` −${e.pct}%`} · ${fmtDur(new Date(e.until) - now())}</span>`).join('')}
+  const effects = ci.effects.length || wound ? `<div class="cb-effects">${wound}${ci.effects.map(e => `<span class="effect ${e.kind}" title="${esc(e.src || '')}">${e.kind === 'tired' ? '😩 ' + L('Yorgun', 'Tired') + ` −${e.pct}%` : e.kind === 'focus' ? '🎯 ' + L('Odak', 'Focus') + ` +${e.pct}%` : e.kind === 'swallow' ? `🧪 ${esc(e.src || 'Swallow')} +${Math.round(e.rate * 10) / 10} ${L('can/sa', 'HP/h')}` : e.kind === 'thunder' ? `⚡ Thunderbolt +${L('%' + e.pct, e.pct + '%')}` : e.kind === 'courage' ? `🍺 ${L('Cesaret', 'Courage')} +${L('%' + e.pct, e.pct + '%')}` : e.kind === 'drunk' ? `🍺 ${L('Sarhoş', 'Drunk')} · ${L('vuruşlar', 'hits')} ×${DATA.EFFECTS.drunk.hurt}` : e.kind === 'blackblood' ? `🩸 Black Blood +${L('%' + e.pct, e.pct + '%')} ${L('kritik', 'crit')}` : e.kind === 'early' || e.kind === 'discipline' ? `✦ ${esc(DATA.UNIQUE_BY_ID[e.kind].name)} +${e.pct}%` : '🥀 ' + L('Bitkin', 'Exhausted') + ` −${e.pct}%`} · ${fmtDur(new Date(e.until) - now())}</span>`).join('')}
       ${ci.deb ? `<small class="muted">${L(`Toplam hasar cezası −%${ci.deb}`, `Total damage penalty −${ci.deb}%`)}</small>` : ''}</div>` : '';
-  const potions = `<div class="cb-potions">
-      <span title="${L(`İçince +${ci.potionHeal} can. Can avda saatte %${+(ci.regen.fight * 100).toFixed(2)} dolar; yenilince saatte %${Math.round(ci.regen.idle * 100)} toparlanırsın.`, `Drinking gives +${ci.potionHeal} HP. HP regenerates ${+(ci.regen.fight * 100).toFixed(2)}%/h while hunting; after a defeat you recover ${Math.round(ci.regen.idle * 100)}%/h.`)}">🧪 Swallow <b>${ci.potions}/${ci.potionCap}</b></span>
-      <button class="btn sm" data-act="drink" ${ci.potions < 1 || s.hp >= E.maxHp() ? 'disabled' : ''} title="+${ci.potionHeal} ${L('can', 'HP')}">🧪 ${L('İç', 'Drink')}</button>
-      <button class="btn sm ghost" data-act="buy" data-id="swallow" ${ci.potions >= ci.potionCap || s.gold < ci.potionPrice ? 'disabled' : ''}>${L('Al', 'Buy')} · ${ci.potionPrice} 🪙</button>
-      </div>
+  const potions = `${potRow('swallow', ci, s, c)}
     <div class="cb-potions">
       <span title="${esc(DATA.SHOP.find(i => i.id === 'honey').desc)}">🍺 Mahakam Ale <b>${ci.honey}/${E.honeyMax()}</b></span>
-      <button class="btn sm" data-act="itemuse" data-id="honey" ${ci.honey < 1 || !E.canDrinkAle() ? 'disabled' : ''} title="${L('Bitkin geçer, 24 saat canavar vuruşları ×2 (Griffin: hasar +%10)', 'Ends Exhausted; monster hits ×2 for 24 hours (Griffin: +10% damage)')}">🍺 ${L('İç', 'Drink')}</button>
+      <button class="btn sm" data-act="itemuse" data-id="honey" ${ci.honey < 1 || !E.canDrinkAle() ? 'disabled' : ''} title="${L('Yorgun ve Bitkin geçer, 24 saat canavar vuruşları ×2 (Griffin: hasar +%10)', 'Ends Tired and Exhausted; monster hits ×2 for 24 hours (Griffin: +10% damage)')}">🍺 ${L('İç', 'Drink')}</button>
       <button class="btn sm ghost" data-act="buy" data-id="honey" ${ci.honey >= E.honeyMax() || s.gold < E.shopItems().find(i => i.id === 'honey').price ? 'disabled' : ''}>${L('Al', 'Buy')} · ${E.shopItems().find(i => i.id === 'honey').price} 🪙</button></div>
-    ${ci.thunders.map(t => `<div class="cb-potions">
-      <span title="${L(`${DATA.THUNDER.hours} saat boyunca hasar +%${t.pct}. Üst üste binmez: yenisi eskisinin yerine geçer.`, `+${t.pct}% damage for ${DATA.THUNDER.hours} hours. Doesn't stack: a new one replaces the old.`)}">⚡ ${esc(t.name)} +${L('%' + t.pct, t.pct + '%')} <b>${t.n}/${ci.thunderCap}</b></span>
-      <button class="btn sm" data-act="thunder" data-id="${t.id}" ${t.n < 1 ? 'disabled' : ''}>⚡ ${L('İç', 'Drink')}</button>
-      ${t.locked ? '' : `<button class="btn sm ghost" data-act="buy" data-id="${t.id}" ${t.n >= ci.thunderCap || s.gold < t.price ? 'disabled' : ''}>${L('Al', 'Buy')} · ${t.price} 🪙</button>`}</div>`).join('')}
+    ${potRow('thunder', ci, s, c)}
     <div class="cb-potions">
       <span title="${esc(DATA.SHOP.find(i => i.id === 'blackblood').desc)}">🩸 Black Blood <b>${s.blackblood || 0}/${E.bbCap()}</b></span>
       <button class="btn sm" data-act="itemuse" data-id="blackblood" ${(s.blackblood || 0) < 1 ? 'disabled' : ''}>🩸 ${L('İç', 'Drink')}</button>
       <button class="btn sm ghost" data-act="buy" data-id="blackblood" ${(s.blackblood || 0) >= E.bbCap() || s.gold < E.shopItems().find(i => i.id === 'blackblood').price ? 'disabled' : ''}>${L('Al', 'Buy')} · ${E.shopItems().find(i => i.id === 'blackblood').price} 🪙</button></div>
-    <div class="cb-potions">
-      <span title="${L(`Canavara ${ci.dancingMin}–${ci.dancingMax} hasar (3–10 saatlik). Attıktan sonra ${ci.dancingCooldown} saat yenisi atılamaz.`, `${ci.dancingMin}–${ci.dancingMax} damage to the monster (3–10 hours' worth). After a throw you must wait ${ci.dancingCooldown} hours.`)}">✴ Dancing Star <b>${ci.dancing}/${ci.dancingCap}</b></span>
-      <button class="btn sm" data-act="dancing" ${ci.dancing < 1 || !c || ci.mode === 'recover' || ci.dancingWait > 0 ? 'disabled' : ''} title="${L(`${ci.dancingMin}–${ci.dancingMax} hasar`, `${ci.dancingMin}–${ci.dancingMax} damage`)}">✴ ${ci.dancingWait > 0 ? `⏳ ${fmtDur(ci.dancingWait)}` : `${L('At', 'Throw')} · ${ci.dancingMin}–${ci.dancingMax}`}</button>
-      <button class="btn sm ghost" data-act="buy" data-id="dancing" ${ci.dancing >= ci.dancingCap || s.gold < ci.dancingPrice ? 'disabled' : ''}>${L('Al', 'Buy')} · ${ci.dancingPrice} 🪙</button></div>`;
+    ${potRow('dancing', ci, s, c)}`;
   const queue = (s.queue || []).length ? `<div class="cb-queue"><small class="muted">${L('Av sırası', 'Hunt queue')}:</small> ${s.queue.map(id => `<span class="q-item">${esc(monById(id).name)} <button class="btn sm ghost" data-act="unqueue" data-id="${id}" title="${L('Sıradan çıkar', 'Remove')}">✕</button></span>`).join('')}</div>` : '';
   const atCap = E.atCap();
   const levelInfo = s.legend ? L("Efsanesin. Bu karakterle devam edebilirsin: kestiğin canavarlar ve bölge boss'ları elit olarak geri dönüyor, TP Ün (★) kazandırıyor. İstersen Karakterlerim sekmesinden yeniden doğabilirsin.", "You are a legend. Keep playing this character: slain monsters and region bosses return as elites, and XP earns Renown (★). You can also be reborn in the School.")
@@ -842,9 +832,32 @@ function renderBestiary() {
     }).join('')}`;
 }
 
+/* ---------- kademeli iksir satırı (savaş paneli): kademe seç, iç / at, al ----------
+ * potSel: seçili kademe (yeniden çizimde korunur); seçili kademe yoksa elindeki en güçlüsü, o da yoksa açık en güçlüsü */
+const potSel = {};
+const POT_UI = { swallow: { icon: '🧪', act: 'drink', verb: ['İç', 'Drink'] }, thunder: { icon: '⚡', act: 'thunder', verb: ['İç', 'Drink'] }, dancing: { icon: '✴', act: 'dancing', verb: ['At', 'Throw'] } };
+const potVal = (kind, g, ci = E.combatInfo()) => (kind === 'swallow' ? `+${g.val} ${L('can', 'HP')} / ${ci.swallowNext} ${L('sa', 'h')}` : kind === 'thunder' ? `+${L('%' + g.val, g.val + '%')} ${L('hasar', 'dmg')}` : `${g.val[0]}–${g.val[1]}`);
+function potRow(kind, ci, s, c) {
+  const P = ci.pots[kind], ui = POT_UI[kind], gs = P.grades;
+  let g = gs.find(x => x.id === potSel[kind]);
+  if (!g) g = [...gs].reverse().find(x => x.n > 0) || [...gs].reverse().find(x => !x.locked) || gs[0];
+  potSel[kind] = g.id;
+  const tip = kind === 'swallow' ? L(`${DATA.POTION.hours} saat boyunca pasif iyileşmeni artırır; üst üste binmez, yenisi eskisinin yerine geçer. Etki sürerken içilen her yeni Swallow 1 saat kısa sürer (sıradaki: ${ci.swallowNext} saat).${ci.swallowFx ? ` Şu an etkide: ${ci.swallowFx.src}.` : ''} Can avda saatte %${+(ci.regen.fight * 100).toFixed(2)} dolar; yenilince saatte %${Math.round(ci.regen.idle * 100)} toparlanırsın.`, `Boosts your passive regeneration for ${DATA.POTION.hours} hours; doesn't stack, a new one replaces the old. Each one drunk while one is active lasts 1 hour less (next: ${ci.swallowNext} h).${ci.swallowFx ? ` Active now: ${ci.swallowFx.src}.` : ''} HP regenerates ${+(ci.regen.fight * 100).toFixed(2)}%/h while hunting; after a defeat you recover ${Math.round(ci.regen.idle * 100)}%/h.`)
+    : kind === 'thunder' ? L(`${DATA.THUNDER.hours} saat boyunca hasar artışı. Üst üste binmez: yenisi eskisinin yerine geçer.`, `Damage boost for ${DATA.THUNDER.hours} hours. Doesn't stack: a new one replaces the old.`)
+    : L(`Aynı canavara atılan her bomba öncekinden %30 az vurur; yeni kontratta sıfırlanır. Şu anki etki: %${Math.round(ci.dancingFade * 100)}.`, `Each bomb thrown at the same monster hits 30% less than the one before; resets with a new contract. Current effect: ${Math.round(ci.dancingFade * 100)}%.`);
+  const sel = gs.length > 1 ? `<select class="pot-grade" data-potsel="${kind}">${gs.map(x => `<option value="${x.id}" ${x.id === g.id ? 'selected' : ''}>${esc(x.name)} · ${potVal(kind, x, ci)} · ×${x.n}</option>`).join('')}</select>`
+    : `<small class="muted">${potVal(kind, g, ci)} · ×${g.n}</small>`;
+  const off = g.n < 1 || (kind === 'swallow' && (s.hp >= E.maxHp() || ci.mode === 'recover')) || (kind === 'dancing' && (!c || ci.mode === 'recover'));
+  const label = L(...ui.verb) + (kind === 'dancing' && ci.dancingFade < 1 ? ` · ${L('%' + Math.round(ci.dancingFade * 100), Math.round(ci.dancingFade * 100) + '%')}` : '');
+  return `<div class="cb-potions">
+      <span title="${esc(tip)}">${ui.icon} ${gs.length > 1 ? esc(P.grades[0].name) : esc(g.name)} <b>${P.n}/${P.cap}</b></span>
+      ${sel}
+      <button class="btn sm" data-act="${ui.act}" data-id="${g.id}" ${off ? 'disabled' : ''} title="${esc(g.name)}: ${potVal(kind, g, ci)}">${ui.icon} ${label}</button>
+      ${g.locked ? '' : `<button class="btn sm ghost" data-act="buy" data-id="${g.id}" ${P.n >= P.cap || s.gold < g.price ? 'disabled' : ''}>${L('Al', 'Buy')} · ${g.price} 🪙</button>`}</div>`;
+}
 /* ---------- tüccar kartları + Eşyalarım ---------- */
 const itemOwned = i => (i.own ? st()[i.own] || 0 : 0);
-const itemCap = i => ({ swallow: E.swallowCap(), honey: E.honeyMax(), dancing: DATA.DANCING.cap, blackblood: E.bbCap() }[i.own] ?? E.thunderCap());
+const itemCap = i => (E.potGroup(i.own) ? E.potCap(E.potGroup(i.own)) : { honey: E.honeyMax(), blackblood: E.bbCap() }[i.own]);
 /* küçük kart: tıklayınca showItemDetail büyütür */
 function itemCard(i, mode) {
   const n = itemOwned(i), s = st();
@@ -958,10 +971,10 @@ function showItemDetail(id, mode) {
     btns = i.locked ? `<span class="muted">🔒 ${L(`${i.lv}. seviyede açılır`, `Unlocks at level ${i.lv}`)}</span>`
       : `<button class="btn" data-act="itembuy" data-id="${i.id}" ${i.disabled || s.gold < i.price ? 'disabled' : ''}>${L('Satın al', 'Buy')} · ${i.price} 🪙</button>`;
   } else {
-    if (i.own === 'swallow') btns = `<button class="btn" data-act="itemuse" data-id="swallow" ${n < 1 || s.hp >= E.maxHp() || ci.mode === 'recover' ? 'disabled' : ''}>🧪 ${L('İç', 'Drink')} · +${ci.potionHeal} ${L('can', 'HP')}</button>`;
+    if (i.own?.startsWith('swallow')) btns = `<button class="btn" data-act="itemuse" data-id="${i.own}" ${n < 1 || s.hp >= E.maxHp() || ci.mode === 'recover' ? 'disabled' : ''}>🧪 ${L('İç', 'Drink')} · +${E.potionHeal(i.own)} ${L('can', 'HP')} / ${ci.swallowNext} ${L('sa', 'h')}</button>`;
     else if (i.own === 'blackblood') btns = `<button class="btn" data-act="itemuse" data-id="blackblood" ${n < 1 ? 'disabled' : ''}>🩸 ${L('İç', 'Drink')}</button>`;
     else if (i.own?.startsWith('thunder')) btns = `<button class="btn" data-act="itemuse" data-id="${i.own}" ${n < 1 ? 'disabled' : ''}>⚡ ${L('İç', 'Drink')}</button>`;
-    else if (i.own === 'dancing') btns = `<button class="btn" data-act="itemuse" data-id="dancing" ${n < 1 || !s.contract || ci.mode === 'recover' || ci.dancingWait > 0 ? 'disabled' : ''}>✴ ${ci.dancingWait > 0 ? `⏳ ${fmtDur(ci.dancingWait)}` : `${L('At', 'Throw')} · ${ci.dancingMin}–${ci.dancingMax}`}</button>`;
+    else if (i.own?.startsWith('dancing')) btns = `<button class="btn" data-act="itemuse" data-id="${i.own}" ${n < 1 || !s.contract || ci.mode === 'recover' ? 'disabled' : ''}>✴ ${L('At', 'Throw')} · ${E.dancingRange(i.own).join('–')}</button>`;
     else if (i.own === 'honey') btns = `<button class="btn" data-act="itemuse" data-id="honey" ${n < 1 || !E.canDrinkAle() ? 'disabled' : ''}>🍺 ${L('İç', 'Drink')}</button>`;
   }
   openModal(`<div class="item-detail">
@@ -1233,8 +1246,8 @@ const SCHOOL_INFO = {
     tag: ['Simyacı', 'The alchemist'],
     mech: [
       ['İksirleri (Swallow, Thunderbolt, Black Blood, Petri’s Philter) yarı fiyatına alırsın.', 'Potions (Swallow, Thunderbolt, Black Blood, Petri’s Philter) cost half.'],
-      ['Swallow, Thunderbolt ve Black Blood’dan 3 fazla taşırsın (5 yerine 8).', 'You can carry 3 more Swallow, Thunderbolt and Black Blood (8 instead of 5).'],
-      ['Dancing Star %30 daha sert vurur.', 'Dancing Star hits 30% harder.'],
+      ['Swallow, Thunderbolt, Black Blood ve Dancing Star’dan 3 fazla taşırsın (5 yerine 8).', 'You can carry 3 more Swallow, Thunderbolt, Black Blood and Dancing Star (8 instead of 5).'],
+      ['Swallow, Thunderbolt ve Dancing Star %30 daha etkilidir.', 'Swallow, Thunderbolt and Dancing Star are 30% more effective.'],
       ['Az orenle (80) ama 1 Thunderbolt ve 3 Dancing Star ile başlar.', 'Starts with few crowns (80) but 1 Thunderbolt and 3 Dancing Stars.'],
     ],
     lore: ['Mantikor Okulu, Kıta\'nın doğusundan, Zerrikanya\'nın çöllerinden geldiği söylenen gizemli bir okuldur. Witcher\'ları simyanın ustasıdır: iksirleri, yağları ve bombaları kendileri hazırlar, kılıçtan çok bu karışımlarla savaşırlar. Kuzey\'de çok nadir görülürler; teçhizatlarının şemaları Toussaint\'in harabelerinde bulunur. Haklarında bilinenler azdır ve öyle kalmasını isterler.',
@@ -1562,9 +1575,9 @@ function showRules() {
   <h3>Hasar</h3>
   <p>Saat başı bir vuruş yaparsın: (seviye gücü + gümüş kılıç) × (1 + bonus). Gümüş kılıç hasar ekler, çelik kılıç kritik şansı verir (×1.5); güçleri kılıcın seviyesine ve kademesine bağlı. Zincir ana güç kaynağıdır: Çelik +%10, Gümüş +%20, Altın +%30, Mithril +%50, Göktaşı +%100. ${MULTI_CHAIN_TXT()} Zincir, kart bağı ve avcı bonusları düz toplanır; tavan yok. Kılıçlar demircide senin seviyende çıkar; seviyesini oren ve kırıntıyla kendi seviyene kadar yükseltebilirsin.</p>
   <h3>Av (idle)</h3>
-  <p>Karakterin kontrattaki canavarla sürekli dövüşür; uygulama kapalıyken de. Saatlik hasarın seviyenden, kılıçlarından, zincirlerinden ve kart bağlarından gelir. Canavar sana kendiliğinden vurmaz: bir görevi geciktirirsen yarım, kaçırırsan tam vurur (boss'lar daha sert). Can avdayken saatte yaklaşık %0,3 dolar (okula göre: Bear %0,5, Griffin %0,35, Wolf %0,3, Viper %0,25, Cat %0,2, Manticore %0,3); yenilip toparlanırken saatte %15 (Bear okulu %30). Kontrat hiç bitmez: istersen panodan başka bir kontrat seçersin (eskisinin ilerlemesi sıfırlanır), seçmezsen en kolay iş kendiliğinden alınır. Acil durumda Swallow içersin: en yüksek canının %50'sini doldurur. Thunderbolt 24 saat hasarı +%20 artırır (Gelişmiş +%30 13. seviyeden, Üstün +%40 25. seviyeden; üst üste binmez). Petri’s Philter alınınca TP verir (+10 / +20 / +35; günde en fazla bir tane). Dancing Star bombası canavara rastgele 3–10 saatlik hasarın kadar vurur; attıktan sonra 48 saat yenisini atamazsın. Canın %50'nin altındayken Yaralısın: hasarın −%20. Can sıfırlanırsa yenilirsin: canavarın canı tamamen dolar, orenin %10'unu kaybedersin ve canın dolana kadar toparlanırsın. Kartlar avdan değil alışkanlıklardan gelir.</p>
+  <p>Karakterin kontrattaki canavarla sürekli dövüşür; uygulama kapalıyken de. Saatlik hasarın seviyenden, kılıçlarından, zincirlerinden ve kart bağlarından gelir. Canavar sana kendiliğinden vurmaz: bir görevi geciktirirsen yarım, kaçırırsan tam vurur (boss'lar daha sert). Can avdayken saatte yaklaşık %0,3 dolar (okula göre: Bear %0,5, Griffin %0,35, Wolf %0,3, Viper %0,25, Cat %0,2, Manticore %0,3); yenilip toparlanırken saatte %15 (Bear okulu %30). Kontrat hiç bitmez: istersen panodan başka bir kontrat seçersin (eskisinin ilerlemesi sıfırlanır), seçmezsen en kolay iş kendiliğinden alınır. Swallow içersen 12 saat boyunca pasif iyileşmen artar: toplam +50 can (Gelişmiş +120 13. seviyeden, Üstün +200 25. seviyeden); üst üste binmez, etki sürerken içtiğin her yeni Swallow 1 saat kısa sürer. Thunderbolt 24 saat hasarı +%20 artırır (Gelişmiş +%30, Üstün +%40; üst üste binmez). Aynı iksirin kademeleri tek cebi paylaşır (ör. 5 Swallow cebine istediğin kademeden); savaş panelinde içmeden önce kademeyi seçersin. Petri’s Philter alınınca TP verir (+10 / +20 / +35; günde en fazla bir tane). Dancing Star bombası canavara rastgele 2–4 saatlik hasarın kadar vurur (Gelişmiş 4–7, Üstün 7–12 saat); aynı canavara attığın her bomba öncekinden %30 az vurur. Canın %50'nin altındayken Yaralısın: hasarın −%20. Can sıfırlanırsa yenilirsin: canavarın canı tamamen dolar, orenin %10'unu kaybedersin ve canın dolana kadar toparlanırsın. Kartlar avdan değil alışkanlıklardan gelir.</p>
   <h3>Cezalar</h3>
-  <p>Gecikmek canavarın yarım vuruşu ve 12 saat "Yorgun" (hasar −%15), kaçırmak tam vuruş ve 24 saat "Bitkin" (−%30) demektir; cezalar birikir ama en çok −%60 olur. Bitkinken Mahakam Ale içebilirsin: Bitkin geçer ama 24 saat sarhoş olursun, canavarın vuruşları ×2. Griffin okulu ne Yorgun ne Bitkin olur.</p>
+  <p>Gecikmek canavarın yarım vuruşu ve 12 saat "Yorgun" (hasar −%15), kaçırmak tam vuruş ve 24 saat "Bitkin" (−%30) demektir; cezalar birikir ama en çok −%60 olur. Yorgun ya da Bitkinken Mahakam Ale içebilirsin: ikisi de geçer ama 24 saat sarhoş olursun, canavarın vuruşları ×2. Griffin okulu ne Yorgun ne Bitkin olur.</p>
   <h3>Zincir</h3>
   <ul>
    <li>Her başarılı gün bir halka: <b>Demir → Çelik (7) → Gümüş (14) → Altın (30) → Mithril (40) → Göktaşı (60)</b>. Her alışkanlığın kendi zinciri vardır.</li>
@@ -1594,9 +1607,9 @@ function showRulesEn() {
   <h3>Damage</h3>
   <p>You strike once an hour: (level power + silver sword) × (1 + bonus). A silver sword adds damage, a steel sword a crit chance (×1.5); their power depends on the sword's level and rarity. Chains are your main power source: Steel +10%, Silver +20%, Gold +30%, Mithril +50%, Meteorite +100%. ${MULTI_CHAIN_TXT()} Chain, card link and bane bonuses simply add up; there is no cap. Swords come at your level; raise their level with crowns and scraps up to your own.</p>
   <h3>The hunt (idle)</h3>
-  <p>Your character fights the contract's monster continuously, even while the app is closed. Your damage per hour comes from your level, swords, chains and card links. Monsters don't hit you on their own: being late on a quest earns you half a hit, missing it a full hit (bosses hit harder). HP regenerates about 0.3% per hour while hunting (by school: Bear 0.5%, Griffin 0.35%, Wolf 0.3%, Viper 0.25%, Cat 0.2%, Manticore 0.3%); while recovering from a defeat, 15% per hour (Bear School 30%). The contract never ends: pick another one from a board if you like (the old one's progress resets), otherwise the easiest job is taken automatically. In an emergency, drink a Swallow: it heals 50% of your max HP. Thunderbolt raises damage by 20% for 24 hours (Enhanced +30% from level 13, Superior +40% from level 25; they don't stack). Petri’s Philter gives XP on purchase (+10 / +20 / +35; at most one a day). The Dancing Star bomb hits the monster for a random 3–10 hours of your damage; after a throw you must wait 48 hours for the next. Below 50% HP you are Wounded: −20% damage. If your HP hits zero you are defeated: the monster heals completely, you lose 10% of your crowns and recover until your HP is full. Cards come from habits, not from the hunt.</p>
+  <p>Your character fights the contract's monster continuously, even while the app is closed. Your damage per hour comes from your level, swords, chains and card links. Monsters don't hit you on their own: being late on a quest earns you half a hit, missing it a full hit (bosses hit harder). HP regenerates about 0.3% per hour while hunting (by school: Bear 0.5%, Griffin 0.35%, Wolf 0.3%, Viper 0.25%, Cat 0.2%, Manticore 0.3%); while recovering from a defeat, 15% per hour (Bear School 30%). The contract never ends: pick another one from a board if you like (the old one's progress resets), otherwise the easiest job is taken automatically. A Swallow boosts your passive regeneration for 12 hours: +50 HP in total (Enhanced +120 from level 13, Superior +200 from level 25); they don't stack, and each one drunk while one is active lasts 1 hour less. Thunderbolt raises damage by 20% for 24 hours (Enhanced +30%, Superior +40%; they don't stack). All grades of a potion share one pocket limit (e.g. any mix of grades in your 5 Swallow slots); in the combat panel you pick the grade before drinking. Petri’s Philter gives XP on purchase (+10 / +20 / +35; at most one a day). The Dancing Star bomb hits the monster for a random 2–4 hours of your damage (Enhanced 4–7, Superior 7–12 hours); each bomb thrown at the same monster hits 30% less than the one before. Below 50% HP you are Wounded: −20% damage. If your HP hits zero you are defeated: the monster heals completely, you lose 10% of your crowns and recover until your HP is full. Cards come from habits, not from the hunt.</p>
   <h3>Penalties</h3>
-  <p>Being late means half a monster hit and 12 hours "Tired" (−15% damage); missing means a full hit and 24 hours "Exhausted" (−30%); penalties stack up to −60%. While Exhausted you can drink Mahakam Ale: Exhausted ends, but you're drunk for 24 hours and monster hits deal ×2. The Griffin School never becomes Tired or Exhausted.</p>
+  <p>Being late means half a monster hit and 12 hours "Tired" (−15% damage); missing means a full hit and 24 hours "Exhausted" (−30%); penalties stack up to −60%. While Tired or Exhausted you can drink Mahakam Ale: both end, but you're drunk for 24 hours and monster hits deal ×2. The Griffin School never becomes Tired or Exhausted.</p>
   <h3>Chain</h3>
   <ul>
    <li>Each successful day adds a link: <b>Iron → Steel (7) → Silver (14) → Gold (30) → Mithril (40) → Meteorite (60)</b>. Every habit has its own chain.</li>
@@ -1693,9 +1706,9 @@ document.addEventListener('click', async e => {
     case 'subtoggle': act(E.toggleItem(t.dataset.item, t.dataset.h)); break;
     case 'addcountin': { const v = +$('#cnt-' + t.dataset.h)?.value; if (!v) return toast(L('Bir sayı gir.', 'Enter a number.'), 'bad'); act(E.addCount(v, t.dataset.h)); break; }
     case 'tab': switchTab(t.dataset.tab); break;
-    case 'drink': act(E.drinkPotion()); break;
-    case 'thunder': act(E.drinkThunder(id || 'thunder')); break;
-    case 'dancing': act(E.throwDancing()); break;
+    case 'drink': act(E.drinkPotion(id)); break;
+    case 'thunder': act(E.drinkThunder(id)); break;
+    case 'dancing': act(E.throwDancing(id)); break;
     case 'queue': if (act(E.queueAdd(id)) && $('#modalBox .cboard')) showBoard(boardSel.r); break;
     case 'unqueue': act(E.queueRemove(id)); break;
     case 'habitdel': {
@@ -1781,7 +1794,7 @@ document.addEventListener('click', async e => {
     case 'puzzleopen': showPuzzle(); break;
     case 'puzzleanswer': answerPuzzle(); break;
     case 'puzzledone': closeModal(); render(); showQueue(); break;
-    case 'itemuse': { const inModal = !!t.closest('#modalBox'); const r = id === 'swallow' ? E.drinkPotion() : id === 'dancing' ? E.throwDancing() : id === 'blackblood' ? E.drinkBlackBlood() : id === 'honey' ? E.drinkAle() : E.drinkThunder(id);
+    case 'itemuse': { const inModal = !!t.closest('#modalBox'); const r = E.potGroup(id) === 'swallow' ? E.drinkPotion(id) : E.potGroup(id) === 'dancing' ? E.throwDancing(id) : id === 'blackblood' ? E.drinkBlackBlood() : id === 'honey' ? E.drinkAle() : E.drinkThunder(id);
       if (!inModal) { act(r); break; }
       closeModal(); if (act(r) && !modalOpen() && (st()[id] || 0) > 0) showItemDetail(id, 'own'); break; }
     case 'buysword': { const w = swordById(id), p = w && E.shopPrice(w); if (w && confirm(L(`${w.name} (seviye ${st().level}) için ${p} oren harcansın mı?`, `Spend ${p} crowns on ${w.name} (level ${st().level})?`))) act(E.buySword(id)); break; }
@@ -1892,6 +1905,7 @@ document.addEventListener('change', e => {
   const f = e.target.dataset?.f;
   if (f) { colFilter[f] = e.target.value; colFilter.page = 0; renderCollection(); }
   if (e.target.id === 'linkFac') { linkFaction = e.target.value; renderLinks(); }
+  if (e.target.dataset?.potsel) { potSel[e.target.dataset.potsel] = e.target.value; render(); }
   if (e.target.dataset?.minicls != null) miniSel.cls[+e.target.dataset.minicls] = e.target.value;
   if (e.target.dataset?.q === 'type') {
     const form = e.target.closest('.qform'); form.dataset.qtype = e.target.value;
@@ -1966,7 +1980,7 @@ function applyStatic() {
   stat('#gold', ['Oren', 'Crowns'], ['Altın (oren)', 'Gold (crowns)']);
   stat('#scraps', ['Kırıntı', 'Scraps'], ['Kırıntı (tekrar kartlardan gelir)', 'Scraps (from duplicate cards)']);
   stat('#chainLen', ['Zincir', 'Chain']);
-  stat('#swallow', ['Swallow', 'Swallow'], ['Swallow: can iksiri. Savaşta canın %35\'in altına inince kendiliğinden içilir.', 'Swallow: healing potion. Drunk automatically in battle below 35% HP.']);
+  stat('#swallow', ['Swallow', 'Swallow'], ['Swallow: can iksiri (bütün kademeler). Savaş panelinden kademesini seçip içersin.', 'Swallow: healing potion (all grades). Pick the grade and drink it from the combat panel.']);
   const lh = $('#logPanel h2'); if (lh) lh.textContent = L('Günlük', 'Journal');
 }
 async function init() {
